@@ -7,7 +7,7 @@ schemaVersion = "0.0.1"
 [package]
 namespace = "Ezomic"
 name = "Threshold"
-versionNumber = "1.1.0"
+versionNumber = "1.0.0"
 description = "A door policy: characters that have played elsewhere do not come in. Off until an admin turns it on."
 websiteUrl = "https://github.com/Ezomic/valheim-threshold"
 containsNsfwContent = false
