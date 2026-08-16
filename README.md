@@ -113,5 +113,54 @@ Registers with Core at `Requirement.Everyone`. Not because clients decide anythi
 server does — but because the facts being judged live on the client and have to be reported,
 so a client without the plugin answers nothing.
 
-**Built and never run.** It compiles, and its handshake is the same shape as Core's, which is
-proven. Nothing in it has been watched refusing or admitting a real connection.
+## Every server must enforce, or the halves stop covering each other
+
+This is the one thing to understand before running more than one server.
+
+The menu guard covers **local worlds only** — a server's world identity is not known until
+after connecting. The door covers **servers**, but only where `Enforce` is on. So a
+non-enforcing server is a hole: a character belonging to another world walks in, the game
+writes that world into its profile, and the mod can then do nothing but log
+
+> Character 'X' is bound to world A but is in world B. Too late to stop it - that world is now
+> written into the character.
+
+Which is exactly what happened the first time two servers ran here, one enforcing and one not.
+The character was ruined by the server that was being lenient.
+
+So: if you run a test server alongside a real one, **enforce on both**, and keep a separate
+character for each. One character, one server, permanently.
+
+If you ever need a genuinely non-enforcing server, the fix is a client-side check in
+`ZNet.RPC_PeerInfo` — the world uid is known there, before the player spawns, so the character
+could be protected whatever the server does. Not implemented, because enforcing everywhere is
+simpler and was enough.
+
+## Recovering a ruined character
+
+Restoring a character backup taken **before** the trip clears its travel record and it is
+admitted again. This is the only way back, and it has been done: a character refused for
+having visited another world came back from backup and was let in.
+
+Note the backup does not touch `threshold-home.txt`, which lives beside the config rather than
+with the character. A restored character can therefore carry a stale home. That is harmless —
+a home pointing at a server world matches no local world, so the menu guard simply refuses all
+of them, which errs toward protection — but the world id quoted in the popup may be the old one.
+
+## Scope
+
+Registers with Core at `Requirement.Everyone`. Not because clients decide anything — only the
+server does — but because the facts being judged live on the client and have to be reported,
+so a client without the plugin answers nothing.
+
+**Both branches have been run against a real dedicated server.** It refuses a character that
+has been elsewhere, with the reason on the client's own screen and in its own log; and it
+**admits** a clean character on an enforcing server. That second one mattered more than it
+sounds: until it happened, "works" and "refuses everybody" were indistinguishable, because
+every test until then involved a character that genuinely had travelled. The only arithmetic in
+the mod is counting worlds that are not this one, and that is now confirmed in both directions.
+
+Also confirmed: the menu guard's binding, the adoption of bindings from Boon's old file, and
+the backup recovery above.
+
+**Not tested:** `RefuseCheats`, which needs a character deliberately flagged by `devcommands`.

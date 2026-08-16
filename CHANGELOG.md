@@ -18,12 +18,30 @@ First release.
   does not exist. Without that, moving the feature between mods would have silently unbound
   every character on the machine and handed everyone one free trip to another world.
 
+### Verified against a real dedicated server
+
+Both branches, which matters more than it sounds. It refuses a character that has been
+elsewhere, with the reason on the client's own screen and in its own log — and it **admits** a
+clean character on an enforcing server. Until the second one happened, "works" and "refuses
+everybody" were indistinguishable, because every test until then used a character that had
+genuinely travelled.
+
+Also confirmed: the menu guard's binding, the adoption of bindings from Boon's old
+`boon-home.txt`, and restoring a character backup as the documented recovery — a refused
+character came back from backup and was admitted.
+
+### Every server must enforce
+
+Found by running two servers, one enforcing and one not. The menu guard covers local worlds
+only; the door covers servers only where `Enforce` is on. A non-enforcing server is therefore a
+hole a bound character walks into, and all the mod can do afterwards is log *"too late to stop
+it - that world is now written into the character"*. The lenient server is the one that ruins
+the character.
+
+Enforce on every server, and keep a separate character for each.
+
 ### Known limits
 
-- **Nobody has ever been admitted.** Every test so far has been a refusal, so the branch that
-  lets a character through has not run. The only arithmetic in the mod is counting worlds that
-  are not this one, and if that were wrong it would refuse *everyone* — a state indistinguishable
-  from the testing done so far. One character whose first destination is a server settles it.
 - `RefuseCheats` is untested; it needs a character deliberately flagged by `devcommands`.
 
 ## [0.1.0] — 2026-08-16
