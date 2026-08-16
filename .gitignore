@@ -11,3 +11,7 @@ obj/
 # BepInEx test profile: third-party binaries, not ours to redistribute.
 # Recreate by copying the BepInEx tree from any existing profile.
 testprofile/
+
+# Thunderstore packaging: staging folder and the zips tcli writes.
+package/
+build/
