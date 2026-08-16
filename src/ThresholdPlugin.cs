@@ -27,9 +27,10 @@ namespace Threshold
     /// load there to do anything at all.
     /// </summary>
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    // Soft, not hard. Threshold installs and runs on its own; a hard dependency that is absent
-    // does not degrade, the plugin simply never loads. Soft still buys the load-order guarantee
-    // when Core is present, which is what registering needs.
+    // Soft, not hard. Threshold installs and runs on its own - a door policy is useful to
+    // somebody running a server who wants none of the rest of this suite - and a hard
+    // dependency that is absent does not degrade, the plugin simply never loads. Soft still
+    // buys the load-order guarantee when Core is present, which is what registering needs.
     [BepInDependency(CoreGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class ThresholdPlugin : BaseUnityPlugin
     {

@@ -96,6 +96,23 @@ the whole exchange finish before anyone is let in.
 the message is sent over the wire before the disconnect and logged on the client's own machine.
 Being told which rule you broke is the difference between a door and a mystery.
 
+## Core is optional
+
+Threshold installs and runs on its own — useful if you want a door policy and none of the rest
+of this suite. Core is a **soft** dependency, and installing Threshold no longer installs it.
+
+**The door itself works standalone.** Doorman carries its own handshake and does its own
+refusing on the server side of `RPC_PeerInfo`; none of that is Core's.
+
+Two things are given up. The **version gate**, which matters more here than elsewhere: the
+facts being judged are reported *by the client*, so an old build of Threshold answering an
+unfamiliar question is precisely the case the gate would have caught. And the **refusal
+screen** — Core is what carries the reason through to Valheim's kick dialog. Without it a
+refused player gets the reason in their own log and a generic screen, which is exactly the
+failure that splitting this out of Boon was meant to fix. It still logs; it just cannot draw.
+
+Install Core on the clients to put the reason back on the screen.
+
 ## Honest limits
 
 `PlayerProfile` lives on the client, so everything judged here is **self-reported**. A
