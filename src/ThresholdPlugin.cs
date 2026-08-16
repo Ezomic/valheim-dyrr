@@ -83,6 +83,13 @@ namespace Threshold
             if (_bound || !ThresholdConfig.ProtectCharacter.Value) return;
             if (ZNet.instance == null || Game.instance == null) return;
 
+            // Only bind where there is a character actually playing. A dedicated server has a
+            // player profile object but nobody behind it, and without this it bound a phantom
+            // "Stranger" to its own world on every startup - one junk line per restart, in a
+            // file that exists to protect characters the server does not have and guards a
+            // menu it never shows.
+            if (Player.m_localPlayer == null) return;
+
             var uid = ZNet.instance.GetWorldUID();
             if (uid == 0L) return;
 
