@@ -1,0 +1,10 @@
+{
+  "name": "Threshold",
+  "author": "Robbin Thijssen",
+  "version_number": "0.1.0",
+  "website_url": "",
+  "description": "A door policy: characters that have played elsewhere do not come in.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2333"
+  ]
+}
