@@ -61,9 +61,6 @@ namespace Threshold
             _harmony.PatchAll(typeof(Doorman));
             _harmony.PatchAll(typeof(MenuGuard));
 
-            // This class carries a patch of its own - the one that forgets the binding when a
-            // world is left - so it has to be handed to Harmony like the others.
-            _harmony.PatchAll(typeof(ThresholdPlugin));
 
             Log.LogInfo(PluginName + " " + PluginVersion + " by " + PluginAuthor + " - ready.");
         }
@@ -75,12 +72,28 @@ namespace Threshold
         ///
         /// Polled rather than hooked because there is no single moment when both ZNet and the
         /// player profile exist and the world UID is known - the same shape the prefab
-        /// registration recipes use. It costs two null checks a frame until it takes, and
-        /// nothing afterwards.
+        /// registration recipes use.
+        ///
+        /// The guard is the character and world last handled, not a bare "already done" flag.
+        /// It was a flag, reset by a ZNet.Shutdown postfix, and that reset did not fire on
+        /// every way of leaving a world - so only the FIRST world of a game session ever
+        /// bound. Seen exactly that way: a character joined the dev server and bound, then a
+        /// second character joined the live server in the same session and was never recorded.
+        ///
+        /// The consequence is worse than a missing log line. An unbound character has no home,
+        /// and MenuGuard only refuses when it knows a home and sees a different world - so the
+        /// preventive half silently stopped protecting anyone who joined a second world without
+        /// restarting the game, which is the ordinary case. The two halves of this mod are
+        /// supposed to cover each other and that left a hole in the one that acts first.
+        ///
+        /// Comparing the pair costs two long compares a frame and cannot go stale, because it
+        /// is derived from the thing it is guarding rather than from an event that has to be
+        /// remembered to fire. Home.Bind ignores a repeat of the same pairing anyway, so this
+        /// is only keeping the common case off the dictionary.
         /// </summary>
         private void Update()
         {
-            if (_bound || !ThresholdConfig.ProtectCharacter.Value) return;
+            if (!ThresholdConfig.ProtectCharacter.Value) return;
             if (ZNet.instance == null || Game.instance == null) return;
 
             // Only bind where there is a character actually playing. A dedicated server has a
@@ -96,19 +109,17 @@ namespace Threshold
             var profile = Game.instance.GetPlayerProfile();
             if (profile == null) return;
 
-            _bound = true;
-            Home.Bind(Home.IdOf(profile), profile.GetName(), uid);
+            var id = Home.IdOf(profile);
+            if (id == 0L) return;
+            if (id == _lastId && uid == _lastWorld) return;
+
+            _lastId = id;
+            _lastWorld = uid;
+            Home.Bind(id, profile.GetName(), uid);
         }
 
-        /// <summary>Reset when a world is left, so the next one binds its own character.</summary>
-        [HarmonyPostfix]
-        [HarmonyPatch(typeof(ZNet), "Shutdown")]
-        private static void OnWorldLeft()
-        {
-            _bound = false;
-        }
-
-        private static bool _bound;
+        private static long _lastId;
+        private static long _lastWorld;
 
         private void OnDestroy()
         {
