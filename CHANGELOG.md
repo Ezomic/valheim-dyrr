@@ -3,6 +3,29 @@
 Notable changes to Threshold. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.0.0] — 2026-08-16
+
+First release.
+
+### Fixed since the split
+
+- **The dedicated server no longer binds a character it does not have.** A server has a
+  `PlayerProfile` object with nobody behind it, so the binding ran there too and minted a
+  fresh phantom id on every startup — one junk line per restart, forever. Binding now requires
+  a local player, which is also the more correct moment: a character has not played anywhere
+  until it spawns.
+- **Bindings are adopted from Boon's `boon-home.txt`** on first run if `threshold-home.txt`
+  does not exist. Without that, moving the feature between mods would have silently unbound
+  every character on the machine and handed everyone one free trip to another world.
+
+### Known limits
+
+- **Nobody has ever been admitted.** Every test so far has been a refusal, so the branch that
+  lets a character through has not run. The only arithmetic in the mod is counting worlds that
+  are not this one, and if that were wrong it would refuse *everyone* — a state indistinguishable
+  from the testing done so far. One character whose first destination is a server settles it.
+- `RefuseCheats` is untested; it needs a character deliberately flagged by `devcommands`.
+
 ## [0.1.0] — 2026-08-16
 
 Split out of [Boon](https://github.com/Ezomic/valheim-boon), where it never belonged.
