@@ -2,10 +2,9 @@
   "name": "Threshold",
   "author": "Robbin Thijssen",
   "website_url": "https://github.com/Ezomic/valheim-threshold",
-  "version_number": "1.0.0",
+  "version_number": "1.1.0",
   "description": "A door policy: characters that have played elsewhere do not come in. Off until an admin turns it on.",
   "dependencies": [
-    "Ezomic-Longhouse_Core-0.2.0",
     "denikson-BepInExPack_Valheim-5.4.2333"
   ]
 }

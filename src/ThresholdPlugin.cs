@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using Ezomic.Core;
 using HarmonyLib;
@@ -25,13 +27,22 @@ namespace Threshold
     /// load there to do anything at all.
     /// </summary>
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    [BepInDependency("ezomic.valheim.core", BepInDependency.DependencyFlags.HardDependency)]
+    // Soft, not hard. Threshold installs and runs on its own; a hard dependency that is absent
+    // does not degrade, the plugin simply never loads. Soft still buys the load-order guarantee
+    // when Core is present, which is what registering needs.
+    [BepInDependency(CoreGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class ThresholdPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "ezomic.valheim.threshold";
         public const string PluginName = "Threshold";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
         public const string PluginAuthor = "Robbin Thijssen";
+
+        /// <summary>Core's plugin GUID. Optional - see TryRegisterWithCore.</summary>
+        internal const string CoreGuid = "ezomic.valheim.core";
+
+        /// <summary>Whether Core answered at load. Read by Doorman's refusal path.</summary>
+        internal static bool CorePresent;
 
         internal static ManualLogSource Log;
 
@@ -42,20 +53,7 @@ namespace Threshold
             Log = Logger;
             ThresholdConfig.Bind(Config);
 
-            // Everyone, not HostOnly, even though only the server decides. The facts being
-            // judged live on the client and have to be reported, so a client without this
-            // plugin answers nothing - and a door that cannot ask its question is not a door.
-            Suite.Register(PluginGuid, PluginName, PluginVersion, Config, Requirement.Everyone);
-
-            // The host's rules are the rules. A client deciding locally that it does not
-            // refuse itself would be meaningless anyway, but syncing keeps the log on both
-            // ends agreeing about what was applied.
-            Suite.Sync(
-                ThresholdConfig.Enabled,
-                ThresholdConfig.Enforce,
-                ThresholdConfig.RefuseOtherWorlds,
-                ThresholdConfig.RefuseCheats,
-                ThresholdConfig.RefuseUnreported);
+            TryRegisterWithCore();
 
             _harmony = new Harmony(PluginGuid);
             _harmony.PatchAll(typeof(Doorman));
@@ -120,6 +118,62 @@ namespace Threshold
 
         private static long _lastId;
         private static long _lastWorld;
+
+        /// <summary>
+        /// Joins Core's version gate when Core is installed, and does nothing when it is not.
+        ///
+        /// Threshold is the mod most likely to be wanted on its own - a door policy is useful
+        /// to somebody running a server who wants none of the rest of this suite - and a hard
+        /// dependency that is absent does not degrade, the plugin never loads at all.
+        ///
+        /// Nothing about the policy needs Core. Doorman carries its own handshake and does its
+        /// own refusing on the server side of RPC_PeerInfo, so the door works standalone. Two
+        /// things are given up. The version gate, so a client running a different build of
+        /// Threshold is no longer reported - which matters more here than elsewhere, because
+        /// the facts being judged are reported *by the client*, and an old build answering an
+        /// unfamiliar question is exactly the case the gate would have caught. And the refusal
+        /// screen: see OnRefused in Doorman, which falls back to the log alone.
+        /// </summary>
+        private void TryRegisterWithCore()
+        {
+            CorePresent = Chainloader.PluginInfos.ContainsKey(CoreGuid);
+
+            if (!CorePresent)
+            {
+                Log.LogInfo("Core not installed - running standalone, without the version gate. "
+                    + "Refused players will be told why in their log, not on the screen.");
+                return;
+            }
+
+            RegisterWithCore();
+        }
+
+        /// <summary>
+        /// Kept separate and never inlined on purpose. The JIT resolves the assemblies a method
+        /// needs when it first compiles that method, so a Suite call sitting directly in Awake
+        /// would drag Ezomic.Core in before the check above could prevent it - and the
+        /// missing-assembly exception would land during plugin load, which is the failure this
+        /// whole arrangement exists to avoid. Isolating it means the type is only ever resolved
+        /// on a machine that has Core.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void RegisterWithCore()
+        {
+            // Everyone, not HostOnly, even though only the server decides. The facts being
+            // judged live on the client and have to be reported, so a client without this
+            // plugin answers nothing - and a door that cannot ask its question is not a door.
+            Suite.Register(PluginGuid, PluginName, PluginVersion, Config, Requirement.Everyone);
+
+            // The host's rules are the rules. A client deciding locally that it does not
+            // refuse itself would be meaningless anyway, but syncing keeps the log on both
+            // ends agreeing about what was applied.
+            Suite.Sync(
+                ThresholdConfig.Enabled,
+                ThresholdConfig.Enforce,
+                ThresholdConfig.RefuseOtherWorlds,
+                ThresholdConfig.RefuseCheats,
+                ThresholdConfig.RefuseUnreported);
+        }
 
         private void OnDestroy()
         {

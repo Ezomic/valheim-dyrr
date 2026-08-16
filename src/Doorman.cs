@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using HarmonyLib;
 
@@ -140,10 +141,30 @@ namespace Threshold
         /// The log alone was not enough, which is the whole lesson of the mod this policy came
         /// out of. A refused player saw "Kicked from server" and had to be told where to look;
         /// Core carries the reason through to the refusal screen itself.
+        ///
+        /// Without Core the log is all there is, and that is a real regression rather than a
+        /// tidy fallback - it is precisely the failure the split from Boon was meant to fix.
+        /// It is still better than refusing to run: a server owner who wants the policy and
+        /// not the suite gets a working door, and the log line is unchanged. Installing Core
+        /// on the client is what puts the reason back on the screen.
         /// </summary>
         private static void OnRefused(ZRpc rpc, string why)
         {
             ThresholdPlugin.Log.LogError("This server refused your character: " + why);
+
+            if (ThresholdPlugin.CorePresent) ExplainOnScreen(why);
+        }
+
+        /// <summary>
+        /// Never inlined, for the same reason as ThresholdPlugin.RegisterWithCore: the JIT
+        /// resolves a method's assemblies when it first compiles that method, so this call
+        /// sitting inline in OnRefused would drag Ezomic.Core in on a machine that has no Core
+        /// - turning a refusal that should have been explained in the log into an exception
+        /// inside an RPC handler.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ExplainOnScreen(string why)
+        {
             Ezomic.Core.Suite.ExplainRefusal(why);
         }
 
