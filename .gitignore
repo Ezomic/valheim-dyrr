@@ -15,3 +15,7 @@ testprofile/
 # Thunderstore packaging: staging folder and the zips tcli writes.
 package/
 build/
+
+# Thunderstore output: the zip is a build artefact and regenerable, like bin/ and
+# obj/. No other repo here tracks it; two of them ignore it explicitly.
+dist/
