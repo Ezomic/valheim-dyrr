@@ -134,10 +134,17 @@ namespace Threshold
             return reasons.Length == 0 ? null : reasons.ToString();
         }
 
-        /// <summary>Client side: say out loud why the door shut.</summary>
+        /// <summary>
+        /// Client side: say out loud why the door shut - on the screen, not only in a log.
+        ///
+        /// The log alone was not enough, which is the whole lesson of the mod this policy came
+        /// out of. A refused player saw "Kicked from server" and had to be told where to look;
+        /// Core carries the reason through to the refusal screen itself.
+        /// </summary>
         private static void OnRefused(ZRpc rpc, string why)
         {
             ThresholdPlugin.Log.LogError("This server refused your character: " + why);
+            Ezomic.Core.Suite.ExplainRefusal(why);
         }
 
         /// <summary>A connection that is gone cannot be asked about again.</summary>
