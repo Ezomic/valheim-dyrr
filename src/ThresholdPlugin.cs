@@ -59,9 +59,49 @@ namespace Threshold
 
             _harmony = new Harmony(PluginGuid);
             _harmony.PatchAll(typeof(Doorman));
+            _harmony.PatchAll(typeof(MenuGuard));
+
+            // This class carries a patch of its own - the one that forgets the binding when a
+            // world is left - so it has to be handed to Harmony like the others.
+            _harmony.PatchAll(typeof(ThresholdPlugin));
 
             Log.LogInfo(PluginName + " " + PluginVersion + " by " + PluginAuthor + " - ready.");
         }
+
+        /// <summary>
+        /// Remember which world this character belongs to, the first time it is seen in one.
+        /// After that the menu refuses to start it anywhere else, which is the only point at
+        /// which that can still be prevented.
+        ///
+        /// Polled rather than hooked because there is no single moment when both ZNet and the
+        /// player profile exist and the world UID is known - the same shape the prefab
+        /// registration recipes use. It costs two null checks a frame until it takes, and
+        /// nothing afterwards.
+        /// </summary>
+        private void Update()
+        {
+            if (_bound || !ThresholdConfig.ProtectCharacter.Value) return;
+            if (ZNet.instance == null || Game.instance == null) return;
+
+            var uid = ZNet.instance.GetWorldUID();
+            if (uid == 0L) return;
+
+            var profile = Game.instance.GetPlayerProfile();
+            if (profile == null) return;
+
+            _bound = true;
+            Home.Bind(Home.IdOf(profile), profile.GetName(), uid);
+        }
+
+        /// <summary>Reset when a world is left, so the next one binds its own character.</summary>
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(ZNet), "Shutdown")]
+        private static void OnWorldLeft()
+        {
+            _bound = false;
+        }
+
+        private static bool _bound;
 
         private void OnDestroy()
         {

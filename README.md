@@ -24,6 +24,32 @@ So the two halves were separated by what each is actually for:
 
 The split also makes each honest about its own limits, which the fused version could not be.
 
+## Two halves, and the important one is the preventive half
+
+**Refusing at the door is the lesser half**, because by the time it fires the harm is already
+done. Loading a character into any world writes that world into `PlayerProfile.m_worldData`
+permanently. Refusing the connection afterwards tells you about a mistake you can no longer
+undo.
+
+So the other half runs on the client, in the menu: **it refuses to start a local world with a
+character that belongs to a different one**. `FejdStartup.OnWorldStart` is the commit point and
+the last moment anything can be done.
+
+It refuses rather than asking. A confirm dialog was tried and rejected — the damage is
+irreversible, so a prompt is just a button for doing the unfixable thing by clicking through
+it. A dead end forces a wrong answer to be diagnosed instead of waved past, so the popup
+carries everything needed to correct it: both ids and the file to edit.
+
+Each character is bound to the first world it is accepted in, recorded in
+`BepInEx/config/threshold-home.txt`. That file is protection, not enforcement — editing it only
+lets you damage your own character, which is why it is plain text you can open and fix. Nothing
+that turns *other people* away is ever read from the client.
+
+Only local worlds are covered by the menu guard, because a server's world identity is not known
+until after connecting. That path is not unguarded: it is the door, which refuses before the
+character ever spawns. The two halves cover each other, which is exactly why they belong in one
+mod — this used to live in Boon, warning about a lockout Boon had no part in.
+
 ## What it checks
 
 | Check | Default | What it means |

@@ -17,11 +17,28 @@ namespace Threshold
         internal static ConfigEntry<bool> RefuseCheats;
         internal static ConfigEntry<bool> RefuseUnreported;
         internal static ConfigEntry<string> RefusedMessage;
+        internal static ConfigEntry<bool> ProtectCharacter;
 
         internal static void Bind(ConfigFile cfg)
         {
             Enabled = cfg.Bind("Door", "Enabled", true,
-                "Off leaves the plugin loaded and checking nothing.");
+                "Off leaves the plugin loaded and checking nothing. Only affects the server "
+                + "side; character protection has its own switch below.");
+
+            // Client-side, and on by default even though Enforce is not. Refusing a connection
+            // is a policy somebody should choose; refusing to let a player irreversibly ruin
+            // their own character is just not standing by while it happens.
+            ProtectCharacter = cfg.Bind("Protect", "ProtectCharacter", true,
+                "Refuse to start a local world with a character that belongs to a different "
+                + "one, and remember which world each character belongs to.\n"
+                + "This is the only half of this mod that can prevent anything. By the time "
+                + "the door refuses a character the damage is already permanent - the game "
+                + "recorded the world it visited and never removes that record. The binding "
+                + "lives in BepInEx/config/threshold-home.txt, which you can edit; it only "
+                + "protects your own characters, so there is nothing there worth defending "
+                + "against you.\n"
+                + "It refuses rather than asking, because a confirm dialog on an irreversible "
+                + "action is just a button for doing the unfixable thing.");
 
             Enforce = cfg.Bind("Door", "Enforce", false,
                 "On refuses the connection. Off only logs what would have been refused.\n" +
