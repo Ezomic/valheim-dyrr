@@ -15,7 +15,7 @@ namespace Threshold
     /// judge. Anything later means deciding on data that has not turned up yet, and the
     /// symptom is a door that admits the first connection and works ever after.
     ///
-    /// It refuses before the player is admitted rather than after they have spawned. Boon's
+    /// It refuses before the player is admitted rather than after they have spawned. Rist's
     /// version - which is where this policy came from - ran after spawn on a routed RPC, so a
     /// refused player watched the world load and then got dropped, which reads far more like a
     /// crash than like a rule.
@@ -143,7 +143,7 @@ namespace Threshold
         /// Core carries the reason through to the refusal screen itself.
         ///
         /// Without Core the log is all there is, and that is a real regression rather than a
-        /// tidy fallback - it is precisely the failure the split from Boon was meant to fix.
+        /// tidy fallback - it is precisely the failure the split from Rist was meant to fix.
         /// It is still better than refusing to run: a server owner who wants the policy and
         /// not the suite gets a working door, and the log line is unchanged. Installing Core
         /// on the client is what puts the reason back on the screen.

@@ -31,7 +31,7 @@ namespace Threshold
         ///
         /// The raw list is sent rather than a count of "other" worlds, because at the moment
         /// this is gathered the client does not reliably know which world it is joining - the
-        /// world UID arrives from the server later in the handshake. Boon's version asked the
+        /// world UID arrives from the server later in the handshake. Rist's version asked the
         /// client to do the subtraction and had to run after spawn to manage it. Sending the
         /// list lets the server, which certainly knows its own UID, do the arithmetic itself,
         /// and lets the whole exchange happen before the player is ever admitted.

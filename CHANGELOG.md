@@ -14,7 +14,7 @@ First release.
   fresh phantom id on every startup — one junk line per restart, forever. Binding now requires
   a local player, which is also the more correct moment: a character has not played anywhere
   until it spawns.
-- **Bindings are adopted from Boon's `boon-home.txt`** on first run if `threshold-home.txt`
+- **Bindings are adopted from Rist's `rist-home.txt`** on first run if `threshold-home.txt`
   does not exist. Without that, moving the feature between mods would have silently unbound
   every character on the machine and handed everyone one free trip to another world.
 
@@ -26,8 +26,8 @@ clean character on an enforcing server. Until the second one happened, "works" a
 everybody" were indistinguishable, because every test until then used a character that had
 genuinely travelled.
 
-Also confirmed: the menu guard's binding, the adoption of bindings from Boon's old
-`boon-home.txt`, and restoring a character backup as the documented recovery — a refused
+Also confirmed: the menu guard's binding, the adoption of bindings from Rist's old
+`rist-home.txt`, and restoring a character backup as the documented recovery — a refused
 character came back from backup and was admitted.
 
 ### Every server must enforce
@@ -46,13 +46,13 @@ Enforce on every server, and keep a separate character for each.
 
 ## [0.1.0] — 2026-08-16
 
-Split out of [Boon](https://github.com/Ezomic/valheim-boon), where it never belonged.
+Split out of [Rist](https://github.com/Ezomic/valheim-rist), where it never belonged.
 
 ### The line this sits on
 
 > **Who comes through the door is server policy. It is not a levelling mod's decision.**
 
-Boon awards character levels for skill gains, so it wanted to know whether a character's skills
+Rist awards character levels for skill gains, so it wanted to know whether a character's skills
 were earned here — and answered by refusing the connection. That put an XP system in charge of
 who is allowed to play, and when it fired the player got Valheim's generic kick screen with the
 reason written only to the server's log, which on someone else's server they can never read.

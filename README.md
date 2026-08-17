@@ -4,9 +4,9 @@ A door policy. Characters that have played on another world do not come in.
 
 ## Why this is its own mod
 
-It used to live inside [Boon](../boon), and that was the wrong place for it.
+It used to live inside [Rist](../rist), and that was the wrong place for it.
 
-Boon awards character levels for skill gains, so it needs to know whether a character's skills
+Rist awards character levels for skill gains, so it needs to know whether a character's skills
 were actually earned on this server. It answered that by **refusing the connection** — which
 put a levelling mod in charge of who is allowed to play. The failure mode is exactly what you
 would expect: a bug in an XP system locks people out of a server. And when it fired, the player
@@ -16,7 +16,7 @@ affected assumed a completely unrelated mod had blocked them.
 
 So the two halves were separated by what each is actually for:
 
-- **Boon** keeps the question it has standing to ask — *do I pay for these levels?* — and
+- **Rist** keeps the question it has standing to ask — *do I pay for these levels?* — and
   answers it by withholding XP. Nobody is disconnected, nothing already earned is removed, and
   the player is told once, on screen.
 - **Threshold** owns the question of who comes through the door. That is a server policy, it
@@ -48,7 +48,7 @@ that turns *other people* away is ever read from the client.
 Only local worlds are covered by the menu guard, because a server's world identity is not known
 until after connecting. That path is not unguarded: it is the door, which refuses before the
 character ever spawns. The two halves cover each other, which is exactly why they belong in one
-mod — this used to live in Boon, warning about a lockout Boon had no part in.
+mod — this used to live in Rist, warning about a lockout Rist had no part in.
 
 ## What it checks
 
@@ -80,14 +80,14 @@ the time `RPC_PeerInfo` runs the answer has arrived and there is something to ju
 later means deciding on data that has not turned up yet — and the symptom of getting that wrong
 is a door that admits the first connection and works ever after.
 
-Two deliberate differences from the version that lived in Boon:
+Two deliberate differences from the version that lived in Rist:
 
-**It refuses before the player is admitted.** Boon's ran after spawn, on a routed RPC, so a
+**It refuses before the player is admitted.** Rist's ran after spawn, on a routed RPC, so a
 refused player watched the world load and then got dropped — which reads far more like a crash
 than like a rule.
 
 **The client sends its raw world list, and the server does the arithmetic.** At handshake time
-the client does not reliably know which world it is joining; the UID arrives later. Boon asked
+the client does not reliably know which world it is joining; the UID arrives later. Rist asked
 the client to subtract the current world itself, which is part of why it had to run so late.
 Sending the list lets the server — which certainly knows its own UID — work it out, and lets
 the whole exchange finish before anyone is let in.
@@ -109,7 +109,7 @@ facts being judged are reported *by the client*, so an old build of Threshold an
 unfamiliar question is precisely the case the gate would have caught. And the **refusal
 screen** — Core is what carries the reason through to Valheim's kick dialog. Without it a
 refused player gets the reason in their own log and a generic screen, which is exactly the
-failure that splitting this out of Boon was meant to fix. It still logs; it just cannot draw.
+failure that splitting this out of Rist was meant to fix. It still logs; it just cannot draw.
 
 Install Core on the clients to put the reason back on the screen.
 
@@ -177,7 +177,7 @@ sounds: until it happened, "works" and "refuses everybody" were indistinguishabl
 every test until then involved a character that genuinely had travelled. The only arithmetic in
 the mod is counting worlds that are not this one, and that is now confirmed in both directions.
 
-Also confirmed: the menu guard's binding, the adoption of bindings from Boon's old file, and
+Also confirmed: the menu guard's binding, the adoption of bindings from Rist's old file, and
 the backup recovery above.
 
 **Not tested:** `RefuseCheats`, which needs a character deliberately flagged by `devcommands`.

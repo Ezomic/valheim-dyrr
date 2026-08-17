@@ -10,14 +10,14 @@ namespace Threshold
     /// <summary>
     /// Threshold. A door policy: characters that have played elsewhere do not come in.
     ///
-    /// This exists because it was living inside Boon, where it did not belong. Boon awards
+    /// This exists because it was living inside Rist, where it did not belong. Rist awards
     /// levels for skill gains, so it wanted to know whether a character's skills were earned
     /// here - and answered that by refusing the connection outright. A levelling mod deciding
     /// who may play is the wrong power in the wrong place: the failure mode is that a bug in
     /// an XP system locks people out of a server, and when it fired the player got Valheim's
     /// generic kick screen with the reason only in a log they had no access to.
     ///
-    /// Split along what each half is actually for. Boon keeps the question it has standing to
+    /// Split along what each half is actually for. Rist keeps the question it has standing to
     /// ask - "do I pay for these levels?" - and answers it by withholding XP, never by
     /// disconnecting anyone. The question of who is allowed through the door is a server
     /// policy, has nothing to do with levelling, and is this.

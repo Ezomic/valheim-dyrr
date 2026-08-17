@@ -27,7 +27,7 @@ namespace Threshold
     /// after connecting. That path is not left unguarded though: it is the other half of this
     /// mod, which refuses at RPC_PeerInfo before the character ever spawns. The two halves
     /// cover each other, which is the reason they belong in one place - this used to live in
-    /// Boon, where it warned about a lockout Boon no longer had anything to do with.
+    /// Rist, where it warned about a lockout Rist no longer had anything to do with.
     /// </summary>
     internal static class MenuGuard
     {

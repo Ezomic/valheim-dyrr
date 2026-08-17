@@ -37,7 +37,7 @@ namespace Threshold
         private static string HomePath => Path.Combine(Paths.ConfigPath, "threshold-home.txt");
 
         /// <summary>
-        /// Where this lived when it was part of Boon. Read once if the new file does not exist
+        /// Where this lived when it was part of Rist, under the name that mod carried then. Read once if the new file does not exist
         /// yet, so moving the feature between mods does not quietly unbind every character on
         /// a machine that already had bindings - which would hand everyone one free trip to
         /// another world, silently, exactly once.
@@ -118,7 +118,7 @@ namespace Threshold
 
             if (path == LegacyPath)
                 ThresholdPlugin.Log.LogInfo(
-                    "Adopting character bindings from Boon's " + LegacyPath +
+                    "Adopting character bindings from Rist's " + LegacyPath +
                     "; they will be written to " + HomePath + " from now on.");
 
             foreach (var line in File.ReadAllLines(path))
@@ -138,7 +138,7 @@ namespace Threshold
             }
 
             // Write the adopted set straight out, so the legacy file stops being consulted and
-            // an old Boon left installed cannot start disagreeing with this one.
+            // an old Rist left installed cannot start disagreeing with this one.
             if (path == LegacyPath) Save();
         }
 
