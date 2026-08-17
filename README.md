@@ -7,7 +7,7 @@ A door policy. Characters that have played on another world do not come in.
 It used to live inside [Rist](../rist), and that was the wrong place for it.
 
 Rist awards character levels for skill gains, so it needs to know whether a character's skills
-were actually earned on this server. It answered that by **refusing the connection** — which
+were actually earned on this server. It answered that by **refusing the connection**, which
 put a levelling mod in charge of who is allowed to play. The failure mode is exactly what you
 would expect: a bug in an XP system locks people out of a server. And when it fired, the player
 got Valheim's generic kick screen with the reason written only to the server's log, which on
@@ -16,7 +16,7 @@ affected assumed a completely unrelated mod had blocked them.
 
 So the two halves were separated by what each is actually for:
 
-- **Rist** keeps the question it has standing to ask — *do I pay for these levels?* — and
+- **Rist** keeps the question it has standing to ask, *do I pay for these levels?*, and
   answers it by withholding XP. Nobody is disconnected, nothing already earned is removed, and
   the player is told once, on screen.
 - **Threshold** owns the question of who comes through the door. That is a server policy, it
@@ -35,20 +35,20 @@ So the other half runs on the client, in the menu: **it refuses to start a local
 character that belongs to a different one**. `FejdStartup.OnWorldStart` is the commit point and
 the last moment anything can be done.
 
-It refuses rather than asking. A confirm dialog was tried and rejected — the damage is
+It refuses rather than asking. A confirm dialog was tried and rejected: the damage is
 irreversible, so a prompt is just a button for doing the unfixable thing by clicking through
 it. A dead end forces a wrong answer to be diagnosed instead of waved past, so the popup
 carries everything needed to correct it: both ids and the file to edit.
 
 Each character is bound to the first world it is accepted in, recorded in
-`BepInEx/config/threshold-home.txt`. That file is protection, not enforcement — editing it only
+`BepInEx/config/threshold-home.txt`. That file is protection, not enforcement; editing it only
 lets you damage your own character, which is why it is plain text you can open and fix. Nothing
 that turns *other people* away is ever read from the client.
 
 Only local worlds are covered by the menu guard, because a server's world identity is not known
 until after connecting. That path is not unguarded: it is the door, which refuses before the
 character ever spawns. The two halves cover each other, which is exactly why they belong in one
-mod — this used to live in Rist, warning about a lockout Rist had no part in.
+mod. This used to live in Rist, warning about a lockout Rist had no part in.
 
 ## What it checks
 
@@ -66,7 +66,7 @@ read what it does, not something that happens because a mod got installed.
 
 **The game never removes entries from a character's world list.** One visit anywhere else is
 permanent for that character file. Restoring a backup taken before the trip is the only way
-back in. The cheat flag is the same — set by `devcommands`, never cleared.
+back in. The cheat flag is the same, set by `devcommands`, never cleared.
 
 That severity is the point: it is what makes a skill level on this server mean something. But
 it has no undo, and it applies to your own character exactly as it does to everyone else's.
@@ -77,19 +77,19 @@ The shape is lifted from Core's version handshake, because the problem is identi
 register an RPC the moment the connection object exists, in `ZNet.OnNewConnection`, which
 happens before either side sends `PeerInfo`. ZRpc delivers in order on one connection, so by
 the time `RPC_PeerInfo` runs the answer has arrived and there is something to judge. Anything
-later means deciding on data that has not turned up yet — and the symptom of getting that wrong
+later means deciding on data that has not turned up yet, and the symptom of getting that wrong
 is a door that admits the first connection and works ever after.
 
 Two deliberate differences from the version that lived in Rist:
 
 **It refuses before the player is admitted.** Rist's ran after spawn, on a routed RPC, so a
-refused player watched the world load and then got dropped — which reads far more like a crash
+refused player watched the world load and then got dropped, which reads far more like a crash
 than like a rule.
 
 **The client sends its raw world list, and the server does the arithmetic.** At handshake time
 the client does not reliably know which world it is joining; the UID arrives later. Rist asked
 the client to subtract the current world itself, which is part of why it had to run so late.
-Sending the list lets the server — which certainly knows its own UID — work it out, and lets
+Sending the list lets the server, which certainly knows its own UID, work it out, and lets
 the whole exchange finish before anyone is let in.
 
 **The reason travels to the client.** Valheim's refusal screen carries no text of its own, so
@@ -98,7 +98,7 @@ Being told which rule you broke is the difference between a door and a mystery.
 
 ## Core is optional
 
-Threshold installs and runs on its own — useful if you want a door policy and none of the rest
+Threshold installs and runs on its own, which is useful if you want a door policy and none of the rest
 of this suite. Core is a **soft** dependency, and installing Threshold no longer installs it.
 
 **The door itself works standalone.** Doorman carries its own handshake and does its own
@@ -107,7 +107,7 @@ refusing on the server side of `RPC_PeerInfo`; none of that is Core's.
 Two things are given up. The **version gate**, which matters more here than elsewhere: the
 facts being judged are reported *by the client*, so an old build of Threshold answering an
 unfamiliar question is precisely the case the gate would have caught. And the **refusal
-screen** — Core is what carries the reason through to Valheim's kick dialog. Without it a
+screen**: Core is what carries the reason through to Valheim's kick dialog. Without it a
 refused player gets the reason in their own log and a generic screen, which is exactly the
 failure that splitting this out of Rist was meant to fix. It still logs; it just cannot draw.
 
@@ -116,8 +116,8 @@ Install Core on the clients to put the reason back on the screen.
 ## Honest limits
 
 `PlayerProfile` lives on the client, so everything judged here is **self-reported**. A
-purpose-built client can lie about all of it. What this catches is the ordinary case — an
-unmodified player bringing a character that levelled somewhere else — because the game records
+purpose-built client can lie about all of it. What this catches is the ordinary case, an
+unmodified player bringing a character that levelled somewhere else, because the game records
 that itself and has no reason to misreport it.
 
 This is a house rule with a lock on the door, not a security boundary. Core's version gate
@@ -126,15 +126,15 @@ has it and has been modified is beyond what any of this can see.
 
 ## Scope
 
-Registers with Core at `Requirement.Everyone`. Not because clients decide anything — only the
-server does — but because the facts being judged live on the client and have to be reported,
+Registers with Core at `Requirement.Everyone`. Not because clients decide anything, since only the
+server does, but because the facts being judged live on the client and have to be reported,
 so a client without the plugin answers nothing.
 
 ## Every server must enforce, or the halves stop covering each other
 
 This is the one thing to understand before running more than one server.
 
-The menu guard covers **local worlds only** — a server's world identity is not known until
+The menu guard covers **local worlds only**; a server's world identity is not known until
 after connecting. The door covers **servers**, but only where `Enforce` is on. So a
 non-enforcing server is a hole: a character belonging to another world walks in, the game
 writes that world into its profile, and the mod can then do nothing but log
@@ -149,7 +149,7 @@ So: if you run a test server alongside a real one, **enforce on both**, and keep
 character for each. One character, one server, permanently.
 
 If you ever need a genuinely non-enforcing server, the fix is a client-side check in
-`ZNet.RPC_PeerInfo` — the world uid is known there, before the player spawns, so the character
+`ZNet.RPC_PeerInfo`, where the world uid is known, before the player spawns, so the character
 could be protected whatever the server does. Not implemented, because enforcing everywhere is
 simpler and was enough.
 
@@ -160,14 +160,14 @@ admitted again. This is the only way back, and it has been done: a character ref
 having visited another world came back from backup and was let in.
 
 Note the backup does not touch `threshold-home.txt`, which lives beside the config rather than
-with the character. A restored character can therefore carry a stale home. That is harmless —
+with the character. A restored character can therefore carry a stale home. That is harmless,
 a home pointing at a server world matches no local world, so the menu guard simply refuses all
-of them, which errs toward protection — but the world id quoted in the popup may be the old one.
+of them, which errs toward protection, but the world id quoted in the popup may be the old one.
 
 ## Scope
 
-Registers with Core at `Requirement.Everyone`. Not because clients decide anything — only the
-server does — but because the facts being judged live on the client and have to be reported,
+Registers with Core at `Requirement.Everyone`. Not because clients decide anything, since only the
+server does, but because the facts being judged live on the client and have to be reported,
 so a client without the plugin answers nothing.
 
 **Both branches have been run against a real dedicated server.** It refuses a character that
