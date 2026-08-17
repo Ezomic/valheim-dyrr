@@ -36,7 +36,7 @@ namespace Threshold
     {
         public const string PluginGuid = "ezomic.valheim.threshold";
         public const string PluginName = "Threshold";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "0.9.0";
         public const string PluginAuthor = "Robbin Thijssen";
 
         /// <summary>Core's plugin GUID. Optional - see TryRegisterWithCore.</summary>

@@ -3,9 +3,13 @@
 Notable changes to Threshold. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
-## [1.0.0] — 2026-08-16
+## [0.9.0] — 2026-08-16
 
-First release.
+Feature complete, and verified against a real dedicated server on both branches. Held below
+1.0 deliberately: **1.0 means published**, and this is not published yet. Carrying a 1.0 while
+nothing was on Thunderstore made the repo claim a release that did not exist, and left the
+zip on disk drifting away from the source under a version number that can never be reissued
+once it is uploaded. The number becomes 1.0.0 on the day it actually ships.
 
 ### Fixed since the split
 
