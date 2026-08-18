@@ -75,6 +75,7 @@ namespace Dyrr
             _harmony = new Harmony(PluginGuid);
             _harmony.PatchAll(typeof(Doorman));
             _harmony.PatchAll(typeof(MenuGuard));
+            _harmony.PatchAll(typeof(CharacterNote));
             _harmony.PatchAll(typeof(Warden));
             _harmony.PatchAll(typeof(Commands));
 

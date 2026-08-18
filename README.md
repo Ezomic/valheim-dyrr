@@ -182,6 +182,24 @@ house rule with a lock on the door, not a security boundary. Core's version gate
 meaningful by refusing clients without the plugin at all; a client that has it and has been
 modified is beyond what any of this can see.
 
+## Before it can refuse: the character-select screen
+
+The refusal popup is a dead end on purpose, and a dead end is a much better thing to arrive at
+knowingly. So the character-select screen carries one line under the name:
+
+> Belongs to world 'longhouse' (-4881...)
+
+or, for a character that has not played anywhere yet:
+
+> Not bound to a world yet. The first one it plays in becomes its home.
+
+It sits in `m_csSourceInfo`, vanilla's own notice label - the one that carries the legacy-save
+and cloud-saves-disabled warnings - so it looks like part of the screen because it is. Nothing
+there prevents anything; it is what stops the refusal at the next screen being a surprise.
+
+It follows `ProtectCharacter`. With the protection off, a binding is a leftover in a file
+rather than a fact about the character, and saying it would imply a rule that is not running.
+
 ## Asking the door what it is doing
 
 `Enforce` off is not a disabled state. It is the state an admin is meant to sit in while

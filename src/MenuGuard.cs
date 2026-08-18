@@ -79,7 +79,12 @@ namespace Dyrr
             return _world != null ? _world.GetValue(fejd) as World : null;
         }
 
-        private static PlayerProfile SelectedProfile(FejdStartup fejd)
+        /// <summary>
+        /// The character currently shown on the selection screen. Internal because
+        /// CharacterNote annotates the same selection this guards, and two copies of the
+        /// reflection would be two things to keep right.
+        /// </summary>
+        internal static PlayerProfile SelectedProfile(FejdStartup fejd)
         {
             if (_profiles == null) _profiles = AccessTools.Field(typeof(FejdStartup), "m_profiles");
             if (_profileIndex == null) _profileIndex = AccessTools.Field(typeof(FejdStartup), "m_profileIndex");

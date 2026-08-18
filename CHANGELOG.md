@@ -26,6 +26,16 @@ against a real server.
   not the server runs this mod at all. New setting `ProtectOnServers`, on by default, under
   `ProtectCharacter`.
 
+- **The character-select screen says which world a character belongs to.** One line under the
+  name, in `m_csSourceInfo` - vanilla's own notice label, the one carrying the legacy-save and
+  cloud-disabled warnings - so the styling and position are the game's problem and not a guess.
+
+  This is the same fact `dyrr home` reports, moved to where the decision is made. The console
+  was the cheapest surface to write and the wrong one: off until somebody enables it, a
+  developer's tool, and it has to be asked. The information matters at exactly one moment, and
+  that moment already has a screen. Nothing here prevents anything - it is the sentence that
+  stops the refusal at the next screen being a surprise.
+
 - **A `dyrr` console command.** `dyrr` prints what the door is doing here: the world, whether
   Enforce is on, which checks are live, how many connections have been refused this session,
   and the standing verdict for every player currently connected. That last part is the point of
