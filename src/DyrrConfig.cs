@@ -1,6 +1,6 @@
 using BepInEx.Configuration;
 
-namespace Threshold
+namespace Dyrr
 {
     /// <summary>
     /// Everything tunable.
@@ -9,7 +9,7 @@ namespace Threshold
     /// saved value beats a new default in code. Changing a default here does nothing on a
     /// machine that has already run the plugin - edit the cfg as part of the same change.
     /// </summary>
-    internal static class ThresholdConfig
+    internal static class DyrrConfig
     {
         internal static ConfigEntry<bool> Enabled;
         internal static ConfigEntry<bool> Enforce;
@@ -34,7 +34,7 @@ namespace Threshold
                 + "This is the only half of this mod that can prevent anything. By the time "
                 + "the door refuses a character the damage is already permanent - the game "
                 + "recorded the world it visited and never removes that record. The binding "
-                + "lives in BepInEx/config/threshold-home.txt, which you can edit; it only "
+                + "lives in BepInEx/config/dyrr-home.txt, which you can edit; it only "
                 + "protects your own characters, so there is nothing there worth defending "
                 + "against you.\n"
                 + "It refuses rather than asking, because a confirm dialog on an irreversible "

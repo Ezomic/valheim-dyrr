@@ -1,15 +1,35 @@
 # Changelog
 
-Notable changes to Threshold. Format follows [Keep a Changelog](https://keepachangelog.com),
+Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
-## [0.9.0] - 2026-08-16
+## [0.9.0] - unreleased
 
 Feature complete, and verified against a real dedicated server on both branches. Held below
 1.0 deliberately: **1.0 means published**, and this is not published yet. Carrying a 1.0 while
 nothing was on Thunderstore made the repo claim a release that did not exist, and left the
 zip on disk drifting away from the source under a version number that can never be reissued
 once it is uploaded. The number becomes 1.0.0 on the day it actually ships.
+
+### Renamed from Threshold, 2026-08-18
+
+*Dyrr* is Old Norse for the doorway itself, which is both what the mod guards and a better fit
+beside Vaettir, Nidling and Rist than an English abstract noun was.
+
+Renaming before publishing rather than after is the entire reason it was cheap. Nothing was on
+Thunderstore to leave stranded, and this mod registers no prefabs, so there are no saved ZDOs
+keyed on a name that would stop resolving. Two things did have to be carried over by hand, and
+both fail silently rather than loudly if forgotten:
+
+- **The config file.** BepInEx names it after the plugin GUID, so a rename hands everyone a
+  file of defaults. That is not merely lost preferences: `Enforce` defaults to off, so a server
+  that had the door on would quietly have it off with nothing said. The plugin now copies
+  `ezomic.valheim.threshold.cfg` to its new name on first run, before binding anything, and
+  leaves the old file alone.
+- **The character bindings.** `threshold-home.txt` is adopted the same way `boon-home.txt`
+  already was, and the fallback is now an ordered chain rather than a single name, so a machine
+  that skipped a release cannot fall between the two. Losing these would hand every character
+  one free trip to another world, silently and exactly once, and that trip has no undo.
 
 ### Fixed since the split
 
@@ -18,7 +38,7 @@ once it is uploaded. The number becomes 1.0.0 on the day it actually ships.
   fresh phantom id on every startup, one junk line per restart, forever. Binding now requires
   a local player, which is also the more correct moment: a character has not played anywhere
   until it spawns.
-- **Bindings are adopted from Rist's `rist-home.txt`** on first run if `threshold-home.txt`
+- **Bindings are adopted from Rist's `rist-home.txt`** on first run if `dyrr-home.txt`
   does not exist. Without that, moving the feature between mods would have silently unbound
   every character on the machine and handed everyone one free trip to another world.
 
@@ -74,7 +94,7 @@ The first time it happened, the person affected blamed an unrelated mod.
   moment anything can be done about it.
 - **The refusal is shown on screen**, on both machines, under the stock kicked line, not
   written to a log the person who needs it cannot read.
-- **A home file per character**, `BepInEx/config/threshold-home.txt`, binding each character to
+- **A home file per character**, `BepInEx/config/dyrr-home.txt`, binding each character to
   the first world that accepted it. Plain text on purpose: it is protection rather than
   enforcement, and editing it can only damage your own character.
 

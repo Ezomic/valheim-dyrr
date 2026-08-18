@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 
-namespace Threshold
+namespace Dyrr
 {
     /// <summary>
     /// Refuses to start a world that would damage the selected character.
@@ -37,7 +37,7 @@ namespace Threshold
         [HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.OnWorldStart))]
         private static bool GuardWorldStart(FejdStartup __instance)
         {
-            if (!ThresholdConfig.ProtectCharacter.Value) return true;
+            if (!DyrrConfig.ProtectCharacter.Value) return true;
 
             var world = SelectedWorld(__instance);
             var profile = SelectedProfile(__instance);
@@ -50,14 +50,14 @@ namespace Threshold
             // accepted anywhere, so any world is a legitimate first one.
             if (id == 0L || home == 0L || home == world.m_uid) return true;
 
-            ThresholdPlugin.Log.LogWarning("Character '" + profile.GetName() + "' (" + id +
+            DyrrPlugin.Log.LogWarning("Character '" + profile.GetName() + "' (" + id +
                 ") belongs to world " + home + " but is being started in world '" +
                 world.m_name + "' (" + world.m_uid + "). Refused.");
 
             // Everything needed to diagnose or override this, since there is no way through it
             // from here: both ids, and the one file that decides.
             UnifiedPopup.Push(new WarningPopup(
-                "Threshold: wrong world for this character",
+                "Dyrr: wrong world for this character",
                 "Character: " + profile.GetName() + "  (id " + id + ")\n" +
                 "This world: " + world.m_name + "  (" + world.m_uid + ")\n" +
                 "Belongs to world: " + home + "\n\n" +
@@ -65,7 +65,7 @@ namespace Threshold
                 "out of its own server. The only undo is restoring a backup, so this is refused " +
                 "rather than confirmed.\n\n" +
                 "If the binding is wrong, delete the line starting " + id + " from " +
-                "BepInEx/config/threshold-home.txt.",
+                "BepInEx/config/dyrr-home.txt.",
                 UnifiedPopup.Pop,
                 localizeText: false));
 

@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using HarmonyLib;
 
-namespace Threshold
+namespace Dyrr
 {
     /// <summary>
     /// What the joining client says about its own character.
@@ -56,7 +56,7 @@ namespace Threshold
             {
                 // A gather that throws must not read as a clean character. It is reported as
                 // unreadable and the server decides what to do with that.
-                ThresholdPlugin.Log.LogWarning("Could not read this character's profile: " + e.Message);
+                DyrrPlugin.Log.LogWarning("Could not read this character's profile: " + e.Message);
                 pkg.Write(false);
                 return pkg;
             }
@@ -84,7 +84,7 @@ namespace Threshold
 
             if (_worldData.Field == null)
             {
-                ThresholdPlugin.Log.LogError(
+                DyrrPlugin.Log.LogError(
                     "PlayerProfile.m_worldData not found - this character's travel cannot be seen.");
                 return;
             }

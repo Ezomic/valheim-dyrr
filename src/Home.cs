@@ -6,7 +6,7 @@ using System.Reflection;
 using BepInEx;
 using HarmonyLib;
 
-namespace Threshold
+namespace Dyrr
 {
     /// <summary>
     /// Which world each character on this machine belongs to.
@@ -19,8 +19,8 @@ namespace Threshold
     ///
     /// What it protects against: taking a character into a different world "just to look".
     /// That writes an entry into PlayerProfile.m_worldData, nothing ever removes it, and the
-    /// door then refuses that character on its own server forever. Threshold is the only thing
-    /// that will ever refuse it, so Threshold is the right place to stop it happening.
+    /// door then refuses that character on its own server forever. Dyrr is the only thing
+    /// that will ever refuse it, so Dyrr is the right place to stop it happening.
     ///
     /// Keyed on the profile's **player id**, not its filename. The filename is the character's
     /// name, which is reused the moment a character is deleted and another made with the same
@@ -34,15 +34,23 @@ namespace Threshold
         private static FieldInfo _playerId;
         private static bool _loaded;
 
-        private static string HomePath => Path.Combine(Paths.ConfigPath, "threshold-home.txt");
+        private static string HomePath => Path.Combine(Paths.ConfigPath, "dyrr-home.txt");
 
         /// <summary>
-        /// Where this lived when it was part of Rist, under the name that mod carried then. Read once if the new file does not exist
-        /// yet, so moving the feature between mods does not quietly unbind every character on
-        /// a machine that already had bindings - which would hand everyone one free trip to
-        /// another world, silently, exactly once.
+        /// Every name this file has carried, newest first, read once if the current one does
+        /// not exist yet.
+        ///
+        /// Without this, renaming quietly unbinds every character on a machine that already had
+        /// bindings - which hands everyone one free trip to another world, silently, exactly
+        /// once, and there is no undo for the trip. It is a chain rather than a single fallback
+        /// because the file has now moved twice: out of Rist when this became its own mod, and
+        /// again when that mod was renamed. A machine that skipped a release must not fall
+        /// between the two.
+        ///
+        /// "boon-home.txt" is Rist's name from before that mod was renamed, so this chain is
+        /// three names for two moves.
         /// </summary>
-        private static string LegacyPath => Path.Combine(Paths.ConfigPath, "boon-home.txt");
+        private static readonly string[] LegacyNames = { "threshold-home.txt", "boon-home.txt" };
 
         /// <summary>The character's unique id, or 0 if it cannot be read.</summary>
         internal static long IdOf(PlayerProfile profile)
@@ -52,7 +60,7 @@ namespace Threshold
             if (_playerId == null) _playerId = AccessTools.Field(typeof(PlayerProfile), "m_playerID");
             if (_playerId == null)
             {
-                ThresholdPlugin.Log.LogError(
+                DyrrPlugin.Log.LogError(
                     "PlayerProfile.m_playerID not found - character protection is off.");
                 return 0L;
             }
@@ -85,7 +93,7 @@ namespace Threshold
             {
                 if (existing == worldUid) return;
 
-                ThresholdPlugin.Log.LogWarning("Character '" + name + "' (" + playerId +
+                DyrrPlugin.Log.LogWarning("Character '" + name + "' (" + playerId +
                     ") is bound to world " + existing + " but is in world " + worldUid +
                     ". Too late to stop it - that world is now written into the character.");
                 return;
@@ -94,7 +102,7 @@ namespace Threshold
             _homes[playerId] = worldUid;
             Save();
 
-            ThresholdPlugin.Log.LogInfo(
+            DyrrPlugin.Log.LogInfo(
                 "Bound character '" + name + "' (" + playerId + ") to world " + worldUid + ".");
         }
 
@@ -110,15 +118,25 @@ namespace Threshold
             if (_loaded) return;
             _loaded = true;
 
-            var path = File.Exists(HomePath) ? HomePath
-                     : File.Exists(LegacyPath) ? LegacyPath
-                     : null;
+            var path = File.Exists(HomePath) ? HomePath : null;
+
+            if (path == null)
+                foreach (var name in LegacyNames)
+                {
+                    var legacy = Path.Combine(Paths.ConfigPath, name);
+                    if (!File.Exists(legacy)) continue;
+
+                    path = legacy;
+                    break;
+                }
 
             if (path == null) return;
 
-            if (path == LegacyPath)
-                ThresholdPlugin.Log.LogInfo(
-                    "Adopting character bindings from Rist's " + LegacyPath +
+            var adopted = path != HomePath;
+
+            if (adopted)
+                DyrrPlugin.Log.LogInfo(
+                    "Adopting character bindings from " + path +
                     "; they will be written to " + HomePath + " from now on.");
 
             foreach (var line in File.ReadAllLines(path))
@@ -138,8 +156,8 @@ namespace Threshold
             }
 
             // Write the adopted set straight out, so the legacy file stops being consulted and
-            // an old Rist left installed cannot start disagreeing with this one.
-            if (path == LegacyPath) Save();
+            // an older build left installed cannot start disagreeing with this one.
+            if (adopted) Save();
         }
 
         private static void Save()
@@ -149,7 +167,7 @@ namespace Threshold
                 var lines = new List<string>
                 {
                     "# Which world each character belongs to: playerId|worldUid",
-                    "# Threshold refuses to start a character in any other world, because doing",
+                    "# Dyrr refuses to start a character in any other world, because doing",
                     "# so permanently records that world in the character and locks it out of",
                     "# its own server. Delete a line to unbind that character.",
                 };
@@ -160,7 +178,7 @@ namespace Threshold
             }
             catch (Exception e)
             {
-                ThresholdPlugin.Log.LogError("Could not write " + HomePath + ": " + e.Message);
+                DyrrPlugin.Log.LogError("Could not write " + HomePath + ": " + e.Message);
             }
         }
     }

@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Runtime.CompilerServices;
 using BepInEx;
 using BepInEx.Bootstrap;
@@ -5,10 +7,10 @@ using BepInEx.Logging;
 using Ezomic.Core;
 using HarmonyLib;
 
-namespace Threshold
+namespace Dyrr
 {
     /// <summary>
-    /// Threshold. A door policy: characters that have played elsewhere do not come in.
+    /// Dyrr. A door policy: characters that have played elsewhere do not come in.
     ///
     /// This exists because it was living inside Rist, where it did not belong. Rist awards
     /// levels for skill gains, so it wanted to know whether a character's skills were earned
@@ -27,20 +29,28 @@ namespace Threshold
     /// load there to do anything at all.
     /// </summary>
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    // Soft, not hard. Threshold installs and runs on its own - a door policy is useful to
+    // Soft, not hard. Dyrr installs and runs on its own - a door policy is useful to
     // somebody running a server who wants none of the rest of this suite - and a hard
     // dependency that is absent does not degrade, the plugin simply never loads. Soft still
     // buys the load-order guarantee when Core is present, which is what registering needs.
     [BepInDependency(CoreGuid, BepInDependency.DependencyFlags.SoftDependency)]
-    public class ThresholdPlugin : BaseUnityPlugin
+    public class DyrrPlugin : BaseUnityPlugin
     {
-        public const string PluginGuid = "ezomic.valheim.threshold";
-        public const string PluginName = "Threshold";
+        public const string PluginGuid = "ezomic.valheim.dyrr";
+        public const string PluginName = "Dyrr";
         public const string PluginVersion = "0.9.0";
         public const string PluginAuthor = "Robbin Thijssen";
 
         /// <summary>Core's plugin GUID. Optional - see TryRegisterWithCore.</summary>
         internal const string CoreGuid = "ezomic.valheim.core";
+
+        /// <summary>
+        /// GUIDs this plugin has been published under, newest first. BepInEx names the config
+        /// file after the GUID, so a rename hands everybody a file of defaults and silently
+        /// discards what they had set - including Enforce, which is the one setting here that
+        /// decides whether anyone can connect at all.
+        /// </summary>
+        private static readonly string[] LegacyGuids = { "ezomic.valheim.threshold" };
 
         /// <summary>Whether Core answered at load. Read by Doorman's refusal path.</summary>
         internal static bool CorePresent;
@@ -52,7 +62,13 @@ namespace Threshold
         private void Awake()
         {
             Log = Logger;
-            ThresholdConfig.Bind(Config);
+
+            // Before Bind, and that ordering is the whole trick. BaseUnityPlugin builds Config
+            // with saveOnInit false, so nothing has been written to the new path yet - dropping
+            // the old file there and reloading lets Bind find every saved value as an orphaned
+            // entry, exactly as if it had always been called that.
+            AdoptOldConfig();
+            DyrrConfig.Bind(Config);
 
             TryRegisterWithCore();
 
@@ -92,7 +108,7 @@ namespace Threshold
         /// </summary>
         private void Update()
         {
-            if (!ThresholdConfig.ProtectCharacter.Value) return;
+            if (!DyrrConfig.ProtectCharacter.Value) return;
             if (ZNet.instance == null || Game.instance == null) return;
 
             // Only bind where there is a character actually playing. A dedicated server has a
@@ -121,16 +137,56 @@ namespace Threshold
         private static long _lastWorld;
 
         /// <summary>
+        /// Copy the settings over from the config file this mod had before it was renamed.
+        ///
+        /// Only ever when the current file does not exist, and never a move - the old file is
+        /// left where it is. A copy is recoverable by hand and a move is not, and the cost of
+        /// leaving it is one stale file nothing reads.
+        ///
+        /// Doing nothing was not an option worth taking. The defaults here are not neutral:
+        /// Enforce defaults to false, so a silent reset does not merely lose preferences, it
+        /// turns the door off on a server that had it on, and nothing would say so.
+        /// </summary>
+        private void AdoptOldConfig()
+        {
+            var current = Path.Combine(Paths.ConfigPath, PluginGuid + ".cfg");
+            if (File.Exists(current)) return;
+
+            foreach (var guid in LegacyGuids)
+            {
+                var old = Path.Combine(Paths.ConfigPath, guid + ".cfg");
+                if (!File.Exists(old)) continue;
+
+                try
+                {
+                    File.Copy(old, current);
+                    Config.Reload();
+                    Log.LogInfo("Adopted settings from " + old + ". Edit " +
+                        Path.GetFileName(current) + " from now on; the old file is left alone " +
+                        "and is no longer read.");
+                }
+                catch (Exception e)
+                {
+                    Log.LogWarning("Could not adopt " + old + " (" + e.Message +
+                        "), so this run uses defaults - including Enforce off. Copy it to " +
+                        Path.GetFileName(current) + " by hand to keep your settings.");
+                }
+
+                return;
+            }
+        }
+
+        /// <summary>
         /// Joins Core's version gate when Core is installed, and does nothing when it is not.
         ///
-        /// Threshold is the mod most likely to be wanted on its own - a door policy is useful
+        /// Dyrr is the mod most likely to be wanted on its own - a door policy is useful
         /// to somebody running a server who wants none of the rest of this suite - and a hard
         /// dependency that is absent does not degrade, the plugin never loads at all.
         ///
         /// Nothing about the policy needs Core. Doorman carries its own handshake and does its
         /// own refusing on the server side of RPC_PeerInfo, so the door works standalone. Two
         /// things are given up. The version gate, so a client running a different build of
-        /// Threshold is no longer reported - which matters more here than elsewhere, because
+        /// Dyrr is no longer reported - which matters more here than elsewhere, because
         /// the facts being judged are reported *by the client*, and an old build answering an
         /// unfamiliar question is exactly the case the gate would have caught. And the refusal
         /// screen: see OnRefused in Doorman, which falls back to the log alone.
@@ -169,11 +225,11 @@ namespace Threshold
             // refuse itself would be meaningless anyway, but syncing keeps the log on both
             // ends agreeing about what was applied.
             Suite.Sync(
-                ThresholdConfig.Enabled,
-                ThresholdConfig.Enforce,
-                ThresholdConfig.RefuseOtherWorlds,
-                ThresholdConfig.RefuseCheats,
-                ThresholdConfig.RefuseUnreported);
+                DyrrConfig.Enabled,
+                DyrrConfig.Enforce,
+                DyrrConfig.RefuseOtherWorlds,
+                DyrrConfig.RefuseCheats,
+                DyrrConfig.RefuseUnreported);
         }
 
         private void OnDestroy()

@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using HarmonyLib;
 
-namespace Threshold
+namespace Dyrr
 {
     /// <summary>
     /// The door.
@@ -22,8 +22,8 @@ namespace Threshold
     /// </summary>
     internal static class Doorman
     {
-        private const string RpcFacts = "Threshold_Facts";
-        private const string RpcRefused = "Threshold_Refused";
+        private const string RpcFacts = "Dyrr_Facts";
+        private const string RpcRefused = "Dyrr_Refused";
 
         /// <summary>What each connection told us, keyed by ZRpc - the only identity that
         /// exists this early, since ZNetPeer is not set up until PeerInfo.</summary>
@@ -69,7 +69,7 @@ namespace Threshold
         [HarmonyPatch(typeof(ZNet), "RPC_PeerInfo")]
         private static bool Judge(ZNet __instance, ZRpc rpc)
         {
-            if (!ThresholdConfig.Enabled.Value) return true;
+            if (!DyrrConfig.Enabled.Value) return true;
             if (!__instance.IsServer()) return true;
 
             Report report;
@@ -78,19 +78,19 @@ namespace Threshold
             var why = Verdict(__instance, heard, report);
             if (why == null) return true;
 
-            if (!ThresholdConfig.Enforce.Value)
+            if (!DyrrConfig.Enforce.Value)
             {
-                ThresholdPlugin.Log.LogWarning("Would have refused a connection: " + why);
+                DyrrPlugin.Log.LogWarning("Would have refused a connection: " + why);
                 return true;
             }
 
-            ThresholdPlugin.Log.LogWarning("Refused a connection: " + why);
+            DyrrPlugin.Log.LogWarning("Refused a connection: " + why);
 
             // Tell them before dropping them. The reason travels to the client so it lands in
             // *their* log, because Valheim's refusal screen carries no text of its own and a
             // player on somebody else's server can never read the server's log. Being told
             // which rule you broke is the difference between a door and a mystery.
-            rpc.Invoke(RpcRefused, ThresholdConfig.RefusedMessage.Value + " (" + why + ")");
+            rpc.Invoke(RpcRefused, DyrrConfig.RefusedMessage.Value + " (" + why + ")");
             rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorKicked);
             return false;
         }
@@ -100,22 +100,22 @@ namespace Threshold
         {
             if (!heard)
             {
-                // No answer at all means the far end has no Threshold. Core's gate should have
+                // No answer at all means the far end has no Dyrr. Core's gate should have
                 // turned that away already, so this is a backstop rather than the main line -
                 // but a door that opens when the question goes unanswered is not a door.
-                return ThresholdConfig.RefuseUnreported.Value
+                return DyrrConfig.RefuseUnreported.Value
                     ? "this client did not report its character"
                     : null;
             }
 
             if (!report.Readable)
-                return ThresholdConfig.RefuseUnreported.Value
+                return DyrrConfig.RefuseUnreported.Value
                     ? "this character's profile could not be read"
                     : null;
 
             var reasons = new StringBuilder();
 
-            if (ThresholdConfig.RefuseOtherWorlds.Value)
+            if (DyrrConfig.RefuseOtherWorlds.Value)
             {
                 var here = net.GetWorldUID();
                 var others = 0;
@@ -126,7 +126,7 @@ namespace Threshold
                     reasons.Append("has played on ").Append(others).Append(" other world(s)");
             }
 
-            if (ThresholdConfig.RefuseCheats.Value && report.Cheats)
+            if (DyrrConfig.RefuseCheats.Value && report.Cheats)
             {
                 if (reasons.Length > 0) reasons.Append(", ");
                 reasons.Append("is flagged as having used cheats");
@@ -150,13 +150,13 @@ namespace Threshold
         /// </summary>
         private static void OnRefused(ZRpc rpc, string why)
         {
-            ThresholdPlugin.Log.LogError("This server refused your character: " + why);
+            DyrrPlugin.Log.LogError("This server refused your character: " + why);
 
-            if (ThresholdPlugin.CorePresent) ExplainOnScreen(why);
+            if (DyrrPlugin.CorePresent) ExplainOnScreen(why);
         }
 
         /// <summary>
-        /// Never inlined, for the same reason as ThresholdPlugin.RegisterWithCore: the JIT
+        /// Never inlined, for the same reason as DyrrPlugin.RegisterWithCore: the JIT
         /// resolves a method's assemblies when it first compiles that method, so this call
         /// sitting inline in OnRefused would drag Ezomic.Core in on a machine that has no Core
         /// - turning a refusal that should have been explained in the log into an exception

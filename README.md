@@ -1,4 +1,4 @@
-# Threshold
+# Dyrr
 
 A door policy. Characters that have played on another world do not come in.
 
@@ -19,7 +19,7 @@ So the two halves were separated by what each is actually for:
 - **Rist** keeps the question it has standing to ask, *do I pay for these levels?*, and
   answers it by withholding XP. Nobody is disconnected, nothing already earned is removed, and
   the player is told once, on screen.
-- **Threshold** owns the question of who comes through the door. That is a server policy, it
+- **Dyrr** owns the question of who comes through the door. That is a server policy, it
   has nothing to do with levelling, and it is the whole of this mod.
 
 The split also makes each honest about its own limits, which the fused version could not be.
@@ -41,7 +41,7 @@ it. A dead end forces a wrong answer to be diagnosed instead of waved past, so t
 carries everything needed to correct it: both ids and the file to edit.
 
 Each character is bound to the first world it is accepted in, recorded in
-`BepInEx/config/threshold-home.txt`. That file is protection, not enforcement; editing it only
+`BepInEx/config/dyrr-home.txt`. That file is protection, not enforcement; editing it only
 lets you damage your own character, which is why it is plain text you can open and fix. Nothing
 that turns *other people* away is ever read from the client.
 
@@ -98,14 +98,14 @@ Being told which rule you broke is the difference between a door and a mystery.
 
 ## Core is optional
 
-Threshold installs and runs on its own, which is useful if you want a door policy and none of the rest
-of this suite. Core is a **soft** dependency, and installing Threshold no longer installs it.
+Dyrr installs and runs on its own, which is useful if you want a door policy and none of the rest
+of this suite. Core is a **soft** dependency, and installing Dyrr no longer installs it.
 
 **The door itself works standalone.** Doorman carries its own handshake and does its own
 refusing on the server side of `RPC_PeerInfo`; none of that is Core's.
 
 Two things are given up. The **version gate**, which matters more here than elsewhere: the
-facts being judged are reported *by the client*, so an old build of Threshold answering an
+facts being judged are reported *by the client*, so an old build of Dyrr answering an
 unfamiliar question is precisely the case the gate would have caught. And the **refusal
 screen**: Core is what carries the reason through to Valheim's kick dialog. Without it a
 refused player gets the reason in their own log and a generic screen, which is exactly the
@@ -159,7 +159,7 @@ Restoring a character backup taken **before** the trip clears its travel record 
 admitted again. This is the only way back, and it has been done: a character refused for
 having visited another world came back from backup and was let in.
 
-Note the backup does not touch `threshold-home.txt`, which lives beside the config rather than
+Note the backup does not touch `dyrr-home.txt`, which lives beside the config rather than
 with the character. A restored character can therefore carry a stale home. That is harmless,
 a home pointing at a server world matches no local world, so the menu guard simply refuses all
 of them, which errs toward protection, but the world id quoted in the popup may be the old one.

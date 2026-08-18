@@ -6,10 +6,10 @@ schemaVersion = "0.0.1"
 
 [package]
 namespace = "Ezomic"
-name = "Threshold"
+name = "Dyrr"
 versionNumber = "0.9.0"
 description = "A door policy: characters that have played elsewhere do not come in. Off until an admin turns it on."
-websiteUrl = "https://github.com/Ezomic/valheim-threshold"
+websiteUrl = "https://github.com/Ezomic/valheim-dyrr"
 containsNsfwContent = false
 
 [package.dependencies]
@@ -21,8 +21,8 @@ readme = "./README.md"
 outdir = "./build"
 
 [[build.copy]]
-source = "./package/BepInEx/plugins/Threshold"
-target = "plugins/Threshold"
+source = "./package/BepInEx/plugins/Dyrr"
+target = "plugins/Dyrr"
 
 [publish]
 repository = "https://thunderstore.io"

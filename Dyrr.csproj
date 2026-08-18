@@ -2,13 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <AssemblyName>Threshold</AssemblyName>
-    <RootNamespace>Threshold</RootNamespace>
+    <AssemblyName>Dyrr</AssemblyName>
+    <RootNamespace>Dyrr</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Version>0.9.0</Version>
     <Authors>Robbin Thijssen</Authors>
     <Company>Thijssen Software</Company>
-    <Product>Threshold</Product>
+    <Product>Dyrr</Product>
     <Description>A door policy: characters that have played elsewhere do not come in.</Description>
     <Copyright>Copyright (c) 2026 Robbin Thijssen</Copyright>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -22,7 +22,7 @@
     <ManagedDir>$(ValheimDir)\valheim_Data\Managed</ManagedDir>
     <ProfileDir Condition="'$(ProfileDir)' == ''">$(MSBuildProjectDirectory)\testprofile</ProfileDir>
     <BepInExCore>$(ProfileDir)\BepInEx\core</BepInExCore>
-    <DeployDir>$(ProfileDir)\BepInEx\plugins\Threshold</DeployDir>
+    <DeployDir>$(ProfileDir)\BepInEx\plugins\Dyrr</DeployDir>
   </PropertyGroup>
 
   <ItemGroup>
