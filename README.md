@@ -222,9 +222,9 @@ never triggers rather than that it triggers wrongly. It is on by default. If you
 not run an untested check, set `RefuseCheats = false`; the other two are the ones doing the
 work.
 
-**The migration from the Threshold-era files has been reasoned about, not run.** The config and
-the character bindings are copied over on first run, and both are copies rather than moves, so
-the originals are still there if anything goes wrong.
+The migration from the Threshold-era files is **confirmed working**, on a real run: the config
+came across with all seven values intact, the character bindings came across in full, and both
+original files were left untouched, since it copies rather than moves.
 
 ## License
 

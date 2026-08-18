@@ -36,6 +36,10 @@ both fail silently rather than loudly if forgotten:
   that skipped a release cannot fall between the two. Losing these would hand every character
   one free trip to another world, silently and exactly once, and that trip has no undo.
 
+Both were then confirmed on a real run rather than left to reasoning: all seven settings and
+every binding line came across, and both original files were still in place afterwards. The
+adoption also correctly does not repeat on the next launch.
+
 ### Fixed since the split
 
 - **The dedicated server no longer binds a character it does not have.** A server has a
