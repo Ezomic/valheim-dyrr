@@ -230,6 +230,16 @@ original files were left untouched, since it copies rather than moves.
 
 MIT. See [LICENSE](LICENSE).
 
+## Reporting bugs
+
+[The Discord](https://discord.gg/hJzAVaZ5wb) is the fastest route, and the right one if
+you are not sure whether what you are seeing is a bug at all. Issues on
+[the repo](https://github.com/Ezomic/valheim-dyrr) work too and suit anything long.
+
+Bring `BepInEx\LogOutput.log` if you can, and say whether you were on a server or your
+own world. The log is most of the difference between a fix and a guess, and it is written
+every session whether or not anything went wrong.
+
 ## Author
 
 Robbin Thijssen / Thijssen Software.
