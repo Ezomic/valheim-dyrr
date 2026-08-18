@@ -3,13 +3,18 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
-## [0.9.0] - unreleased
+## [1.0.0] - 2026-08-18
 
-Feature complete, and verified against a real dedicated server on both branches. Held below
-1.0 deliberately: **1.0 means published**, and this is not published yet. Carrying a 1.0 while
-nothing was on Thunderstore made the repo claim a release that did not exist, and left the
-zip on disk drifting away from the source under a version number that can never be reissued
-once it is uploaded. The number becomes 1.0.0 on the day it actually ships.
+First published release.
+
+The number means published and nothing else. It sat at 0.9.0 while the repo was public and
+Thunderstore had nothing on it, because a 1.0 with no package behind it claims a release that
+does not exist, and because a Thunderstore version can never be reissued once uploaded - so the
+number had to be spent on the build that actually ships rather than on one that drifted away
+from it on disk.
+
+Everything below this line was already true at 0.9.0. Nothing about the mod's behaviour changed
+to get here.
 
 ### Renamed from Threshold, 2026-08-18
 

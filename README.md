@@ -2,6 +2,22 @@
 
 A door policy. Characters that have played on another world do not come in.
 
+*Dyrr* is Old Norse for the doorway itself. This mod was called **Threshold** until 2026-08-18;
+nothing about it changed but the name. If you ran it under the old name, your settings and your
+character bindings are carried over on the first run and you do not need to do anything.
+
+## Installing
+
+Needs BepInEx. Core is optional, see below. Through a mod manager it is one install. By hand,
+put `Dyrr.dll` in `BepInEx/plugins/Dyrr/`.
+
+Then start the game once and quit. That first run writes the config file, which does not exist
+before the mod has loaded, and that is the usual reason people think it is broken.
+
+**Nothing is refused until you turn `Enforce` on.** Out of the box the door only logs what it
+would have refused, on purpose. The half that does work immediately is the menu guard on the
+client, which stops you taking a character into a world it does not belong to.
+
 ## Why this is its own mod
 
 It used to live inside [Rist](../rist), and that was the wrong place for it.
@@ -52,11 +68,9 @@ mod. This used to live in Rist, warning about a lockout Rist had no part in.
 
 ## What it checks
 
-| Check | Default | What it means |
-| --- | --- | --- |
-| `RefuseOtherWorlds` | on | The character has spawned in some world other than this one |
-| `RefuseCheats` | on | The game has flagged the character as having used cheats |
-| `RefuseUnreported` | on | The connection answered nothing, or its profile could not be read |
+Three questions, asked of every connection: has this character spawned in a world other than
+this one, has the game flagged it for cheats, and did it answer at all. Each can be turned off
+on its own; see [Settings](#settings) for the full list.
 
 `Enforce` is **off by default**, and deliberately. This is the one setting in the family that
 can lock people out of a server, including you. It should be something an admin turns on having
@@ -124,6 +138,29 @@ This is a house rule with a lock on the door, not a security boundary. Core's ve
 makes it meaningful by refusing clients that do not have the plugin at all, but a client that
 has it and has been modified is beyond what any of this can see.
 
+## Settings
+
+The file is `BepInEx/config/ezomic.valheim.dyrr.cfg`. Every entry carries a comment explaining
+itself, so the file is the reference; this is the map.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `Enabled` | on | Off leaves the plugin loaded and checking nothing. Server side only |
+| `Enforce` | **off** | On refuses the connection. Off only logs what would have been refused |
+| `RefuseOtherWorlds` | on | Refuse a character that has spawned in any world but this one |
+| `RefuseCheats` | on | Refuse a character the game has flagged for `devcommands` use |
+| `RefuseUnreported` | on | Refuse a connection that answers nothing, or an unreadable profile |
+| `RefusedMessage` | *a sentence* | Sent to the refused client so it lands in their own log |
+| `ProtectCharacter` | on | The client-side menu guard, and the binding that feeds it |
+
+Note the standing BepInEx behaviour: every entry is written to disk on the first run and the
+saved value beats a new default in code. Changing a default in a later version does nothing on
+a machine that has already run the mod.
+
+`ProtectCharacter` is on while `Enforce` is off, and that asymmetry is deliberate. Refusing
+other people is a policy somebody should choose; refusing to let you irreversibly ruin your own
+character is just not standing by while it happens.
+
 ## Scope
 
 Registers with Core at `Requirement.Everyone`. Not because clients decide anything, since only the
@@ -164,11 +201,7 @@ with the character. A restored character can therefore carry a stale home. That 
 a home pointing at a server world matches no local world, so the menu guard simply refuses all
 of them, which errs toward protection, but the world id quoted in the popup may be the old one.
 
-## Scope
-
-Registers with Core at `Requirement.Everyone`. Not because clients decide anything, since only the
-server does, but because the facts being judged live on the client and have to be reported,
-so a client without the plugin answers nothing.
+## Status: v1.0
 
 **Both branches have been run against a real dedicated server.** It refuses a character that
 has been elsewhere, with the reason on the client's own screen and in its own log; and it
@@ -177,7 +210,26 @@ sounds: until it happened, "works" and "refuses everybody" were indistinguishabl
 every test until then involved a character that genuinely had travelled. The only arithmetic in
 the mod is counting worlds that are not this one, and that is now confirmed in both directions.
 
-Also confirmed: the menu guard's binding, the adoption of bindings from Rist's old file, and
+Also confirmed: the menu guard's binding, the adoption of bindings from the old home file, and
 the backup recovery above.
 
-**Not tested:** `RefuseCheats`, which needs a character deliberately flagged by `devcommands`.
+### Known gaps
+
+**`RefuseCheats` has never fired.** It needs a character deliberately flagged by `devcommands`,
+and no test so far has produced one. The code path is three lines and shares the reporting and
+refusal machinery that the other two checks have exercised thoroughly, so the risk is that it
+never triggers rather than that it triggers wrongly. It is on by default. If you would rather
+not run an untested check, set `RefuseCheats = false`; the other two are the ones doing the
+work.
+
+**The migration from the Threshold-era files has been reasoned about, not run.** The config and
+the character bindings are copied over on first run, and both are copies rather than moves, so
+the originals are still there if anything goes wrong.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+## Author
+
+Robbin Thijssen / Thijssen Software.
