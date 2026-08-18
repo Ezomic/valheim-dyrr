@@ -14,9 +14,10 @@ namespace Dyrr
     /// cheat command added by some other mod on the server is classified correctly for free,
     /// without this having to know it exists.
     ///
-    /// The live table is Terminal.ConsoleCommand's own static dictionary, which every command
-    /// registers itself into, carrying the IsCheat flag the game already uses to gate them.
-    /// That is the real answer and it is used whenever it is available.
+    /// The live table is Terminal's own static dictionary, which every command registers
+    /// itself into, carrying the IsCheat flag the game already uses to gate them. That is the
+    /// real answer and it is used whenever it is available - note which class it is on, and
+    /// see Live for the session that cost.
     ///
     /// The fallback list below is the same answer, ripped out of the game rather than typed
     /// from memory: every command in Terminal.InitTerminal constructed with isCheat: true, as
