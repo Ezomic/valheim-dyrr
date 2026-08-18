@@ -85,17 +85,28 @@ namespace Dyrr
         /// </summary>
         private static HashSet<string> Live()
         {
-            if (_table == null)
-                _table = AccessTools.Field(typeof(Terminal.ConsoleCommand), "commands");
+            // On Terminal, not on Terminal.ConsoleCommand. The dictionary is written from the
+            // ConsoleCommand constructor - "commands[command.ToLower()] = this" - which reads
+            // like a member of that class and is not: a nested class reaches its outer class's
+            // statics by plain name. AccessTools.Field walks base types, never outer ones, so
+            // asking the nested type found nothing and this quietly ran on the fallback list
+            // for every connection, while reporting the dedicated server as the reason.
+            if (_table == null) _table = AccessTools.Field(typeof(Terminal), "commands");
 
-            if (_table == null) return Fallback("Terminal.ConsoleCommand.commands not found");
+            if (_table == null)
+                return Fallback("Terminal.commands was not found at all, which means the game "
+                    + "has changed - only cheat commands Dyrr already knew about are seen", true);
 
             IDictionary map;
             try { map = _table.GetValue(null) as IDictionary; }
-            catch (Exception e) { return Fallback("could not read the command table (" + e.Message + ")"); }
+            catch (Exception e)
+            {
+                return Fallback("the command table could not be read (" + e.Message + ")", true);
+            }
 
             if (map == null || map.Count == 0)
-                return Fallback("no console has been created in this process yet");
+                return Fallback("no console has been created in this process yet, which is "
+                    + "ordinary on a dedicated server", false);
 
             var names = new HashSet<string>();
 
@@ -108,18 +119,32 @@ namespace Dyrr
                 if (!string.IsNullOrEmpty(name)) names.Add(name.ToLowerInvariant());
             }
 
-            return names.Count == 0 ? Fallback("the command table holds no cheat commands") : names;
+            return names.Count == 0
+                ? Fallback("the command table holds no cheat commands", true)
+                : names;
         }
 
-        /// <summary>Say once why the shipped list is being used, then stop saying it.</summary>
-        private static HashSet<string> Fallback(string why)
+        /// <summary>
+        /// Say once why the shipped list is being used, then stop saying it.
+        ///
+        /// Loud or quiet depending on whether it is a situation or a fault. A dedicated server
+        /// that has never built a console is working exactly as expected and does not deserve a
+        /// warning every time it starts. A table that cannot be found or read means the game
+        /// moved and the list is frozen at whatever shipped, which is worth being told about -
+        /// the first version logged both at Info and the real one hid in plain sight for a
+        /// whole session, reported as the expected case.
+        /// </summary>
+        private static HashSet<string> Fallback(string why, bool wrong)
         {
             if (!_warned)
             {
                 _warned = true;
-                DyrrPlugin.Log.LogInfo("Classifying cheat commands from the list built into " +
-                    "Dyrr rather than from the game's own table, because " + why +
-                    ". This is the expected case on a dedicated server.");
+
+                var said = "Classifying cheat commands from the list built into Dyrr rather "
+                    + "than from the game's own table, because " + why + ".";
+
+                if (wrong) DyrrPlugin.Log.LogWarning(said);
+                else DyrrPlugin.Log.LogInfo(said);
             }
 
             return null;
