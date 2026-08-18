@@ -79,7 +79,7 @@ namespace Dyrr
 
                     foreach (var command in profile.m_knownCommands) commands.Add(command.Key);
 
-                    CollectWorlds(profile, uids);
+                    uids = WorldsOf(profile);
                 }
             }
             catch (Exception e)
@@ -142,9 +142,17 @@ namespace Dyrr
         ///
         /// Worth knowing before turning this on: entries are never removed. One visit anywhere
         /// else is permanent for that character file.
+        ///
+        /// Also read from the menu, where it is the answer rather than the evidence: a
+        /// character with exactly one world in here has a home whether or not this mod has ever
+        /// watched it play. SaveSystem.GetAllPlayerProfiles calls PlayerProfile.Load, which
+        /// parses this dictionary in full, so the menu's profile objects carry it already.
         /// </summary>
-        private static void CollectWorlds(PlayerProfile profile, List<long> into)
+        internal static List<long> WorldsOf(PlayerProfile profile)
         {
+            var into = new List<long>();
+            if (profile == null) return into;
+
             if (_worldData == null)
                 _worldData = AccessTools.Field(typeof(PlayerProfile), "m_worldData");
 
@@ -152,13 +160,15 @@ namespace Dyrr
             {
                 DyrrPlugin.Log.LogError(
                     "PlayerProfile.m_worldData not found - this character's travel cannot be seen.");
-                return;
+                return into;
             }
 
-            if (!(_worldData.GetValue(profile) is IDictionary map)) return;
+            if (!(_worldData.GetValue(profile) is IDictionary map)) return into;
 
             foreach (DictionaryEntry entry in map)
                 if (entry.Key is long uid) into.Add(uid);
+
+            return into;
         }
     }
 }

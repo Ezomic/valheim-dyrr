@@ -26,9 +26,29 @@ against a real server.
   not the server runs this mod at all. New setting `ProtectOnServers`, on by default, under
   `ProtectCharacter`.
 
-- **The character-select screen says which world a character belongs to.** One line under the
-  name, in `m_csSourceInfo` - vanilla's own notice label, the one carrying the legacy-save and
-  cloud-disabled warnings - so the styling and position are the game's problem and not a guess.
+- **The character-select screen says which world a character belongs to.** One line above the
+  name, cloned from `m_csFileSource` - vanilla's own "Cloud save" label - so the font, size,
+  colour and alignment are the game's and not a guess.
+
+  It reads the binding file first, and **the character second, which is where it earns its
+  keep**. A binding is only written when a character spawns while Dyrr is running, so every
+  character that last played before the mod arrived had none and said so. But
+  `PlayerProfile.m_worldData` is one entry per world a character has spawned in, and
+  `SaveSystem.GetAllPlayerProfiles` parses it in full for the menu - so the answer was already
+  in memory. Exactly one world is that character's home by definition, and it is bound on the
+  spot rather than merely shown; leaving it unbound would mean the menu guard protecting
+  nothing until the character happened to play again.
+
+  More than one world is left unbound on purpose and **named rather than counted**: "Has played
+  in BaldoTest and longhouse_20260818". There is no single home to defend, and a count tells
+  somebody they have a problem without telling them what it is. Names come from the local world
+  list where the world is on this disk, topped up from `m_knownWorlds` where it is not - the
+  game's own record of where a character has played, keyed by name where `m_worldData` is keyed
+  by uid. That pairing is what names a **server's** world that nothing local could.
+
+  No bare uid ever appears on that line. Nineteen digits standing where the answer goes was the
+  first version of it; a world that still cannot be named now says it is not on this PC, and a
+  name worked out late is written back into the binding so it is only worked out once.
 
   This is the same fact `dyrr home` reports, moved to where the decision is made. The console
   was the cheapest surface to write and the wrong one: off until somebody enables it, a

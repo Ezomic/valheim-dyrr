@@ -131,10 +131,17 @@ namespace Dyrr
                     // The ids already match, so nothing about the binding changes - but the
                     // names may be blank on a line adopted from the id-only format, and this
                     // is the one moment both are known. Filling them in costs one write, once.
-                    if (!string.IsNullOrEmpty(existing.Character) && !string.IsNullOrEmpty(existing.WorldName)) return;
+                    var character = Clean(name);
+                    var world = Clean(worldName);
 
-                    existing.Character = Clean(name);
-                    existing.WorldName = Clean(worldName);
+                    // Only when there is something to add. Without this, a binding whose world
+                    // cannot be named rewrites the whole file every time it is looked at.
+                    var gained = (character.Length > 0 && existing.Character != character)
+                        || (world.Length > 0 && existing.WorldName != world);
+                    if (!gained) return;
+
+                    if (character.Length > 0) existing.Character = character;
+                    if (world.Length > 0) existing.WorldName = world;
                     _homes[playerId] = existing;
                     Save();
                     return;
@@ -157,6 +164,28 @@ namespace Dyrr
 
             DyrrPlugin.Log.LogInfo("Bound character '" + name + "' (" + playerId +
                 ") to world '" + worldName + "' (" + worldUid + ").");
+        }
+
+        /// <summary>
+        /// Put a name on a binding that has only numbers, without touching which world it is.
+        ///
+        /// Bindings made before names were recorded, or made against a world this machine could
+        /// not name at the time, are the reason this exists. The world is never changed here -
+        /// that is Bind's job and Bind refuses to do it - so the worst this can be is a wrong
+        /// label on a right binding, which is visible and correctable rather than silent.
+        /// </summary>
+        internal static void Name(long playerId, string worldName)
+        {
+            Load();
+
+            var clean = Clean(worldName);
+            if (clean.Length == 0) return;
+            if (!_homes.TryGetValue(playerId, out var binding)) return;
+            if (binding.WorldName == clean) return;
+
+            binding.WorldName = clean;
+            _homes[playerId] = binding;
+            Save();
         }
 
         /// <summary>Forget a binding, so the character may be taken anywhere again.</summary>
