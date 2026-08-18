@@ -79,9 +79,11 @@ belong in one mod. This used to live in Rist, warning about a lockout Rist had n
 
 ## What it checks
 
-Three questions, asked of every connection: has this character spawned in a world other than
-this one, has the game flagged it for cheats, and did it answer at all. Each can be turned off
-on its own; see [Settings](#settings) for the full list.
+Six questions, asked of every connection: has this character spawned in a world other than this
+one, has the game flagged it for cheats, has it run a console command the game calls a cheat,
+do its own records disagree with each other, is the client running mods this server does not
+allow, and did it answer at all. Each can be turned off on its own; see
+[Settings](#settings) for the full list.
 
 `Enforce` is **off by default**, and deliberately. This is the one setting in the family that
 can lock people out of a server, including you. It should be something an admin turns on having
@@ -138,16 +140,47 @@ failure that splitting this out of Rist was meant to fix. It still logs; it just
 
 Install Core on the clients to put the reason back on the screen.
 
-## Honest limits
+## On cheating, and what a door can actually do about it
 
-`PlayerProfile` lives on the client, so everything judged here is **self-reported**. A
-purpose-built client can lie about all of it. What this catches is the ordinary case, an
-unmodified player bringing a character that levelled somewhere else, because the game records
-that itself and has no reason to misreport it.
+Start with the line that decides everything: **`Console.IsCheatsEnabled()` returns
+`ZNet.instance.IsServer()`.** On a dedicated server a client's own `devcommands` is inert - it
+flips a bool the gate then ignores. So nobody is cheating on somebody else's server with
+vanilla. Anybody cheating there is running a mod that patched around that line, which means the
+useful question is not *did this character use cheats* but **what is this client running**.
+That is what `RefuseMods` asks, and it is the check that actually reaches the problem.
 
-This is a house rule with a lock on the door, not a security boundary. Core's version gate
-makes it meaningful by refusing clients that do not have the plugin at all, but a client that
-has it and has been modified is beyond what any of this can see.
+The character checks still matter, because a cheat mod leaves marks. `m_usedCheats` is a bool
+set in `Terminal.ConsoleCommand.RunAction`, and a mod that switches devcommands on will trip
+it. A mod that also clears it will not - but it has to clear the same fact in four places, and
+they are written at different moments by different code:
+
+| Record | Written | Independent because |
+| --- | --- | --- |
+| `m_usedCheats` | in `RunAction`, if the command is a cheat | the one everybody knows about |
+| `m_playerStats[Cheats]` | the very next line | a counter, not a bool |
+| `m_knownCommands` | a few lines down, **outside** the cheat branch | records the name of *every* command run |
+| `m_knownWorlds` | in `SavePlayerToDisk`, by world **name** | `m_worldData` records the same trips by **uid** |
+
+So the flag being clear while the counter is above zero is not a suspicion, it is an edit. More
+world names than world uids means the travel record was scrubbed - and that inequality only
+runs one way, so the game itself cannot trip it. That is `RefuseTampered`, and it is the only
+check here that does not need the client to be honest, only consistent.
+
+Which commands count as cheats is decided **on the server**, from the server's own command
+table, so a cheat command added by another mod counts for free and the client has no say in the
+rule it is judged by.
+
+### The limit, stated plainly
+
+`PlayerProfile` lives on the client, so **everything here is self-reported**, the mod list
+included. A purpose-built client can lie about all of it, and no amount of extra records
+changes that - it only raises what a liar has to keep straight.
+
+What this catches is the ordinary case: somebody who installed a cheat mod from Thunderstore
+and did not think about it, or brought a character that levelled somewhere else. That is a
+house rule with a lock on the door, not a security boundary. Core's version gate makes it
+meaningful by refusing clients without the plugin at all; a client that has it and has been
+modified is beyond what any of this can see.
 
 ## Asking the door what it is doing
 
@@ -189,6 +222,29 @@ to somebody already at its console, and the bindings are this machine's own text
 The console needs Valheim's `-console` launch argument on a client. A dedicated server has one
 already.
 
+## Turning the mod check on without locking out your own players
+
+`ModPolicy = Allow` refuses a client running anything the server does not, which is the point,
+and also the way to empty a server by accident. Both lists ship **empty** and `DeniedMods`
+could not honestly ship otherwise - a list of cheat mod GUIDs written in advance is out of date
+the week after and reads as complete when it is not.
+
+What you build them from is what actually turns up. **Every plugin a client brings that this
+server does not run is written to the log as it connects**, admitted or refused:
+
+```
+A client brought 2 plugin(s) this server does not run: randyknapp.mods.equipmentandquickslots, ...
+```
+
+So the order that works is: leave `Enforce` off, let people connect, run `dyrr` and read the
+log, put the innocent ones in `AllowedMods`, and only then turn `Enforce` on. `dyrr` prints the
+standing verdict for everyone currently connected, which is the whole point of Enforce having
+an off position.
+
+One case worth naming because it will be yours: a server does not run the tools you develop
+with. If your own client carries something the server does not, it is refused by its own door
+like anybody else, and the fix is a line in `AllowedMods`.
+
 ## Settings
 
 The file is `BepInEx/config/ezomic.valheim.dyrr.cfg`. Every entry carries a comment explaining
@@ -200,6 +256,12 @@ itself, so the file is the reference; this is the map.
 | `Enforce` | **off** | On refuses the connection. Off only logs what would have been refused |
 | `RefuseOtherWorlds` | on | Refuse a character that has spawned in any world but this one |
 | `RefuseCheats` | on | Refuse a character the game has flagged for `devcommands` use |
+| `RefuseCheatCommands` | on | Refuse a character that has run a command the game marks as a cheat |
+| `RefuseTampered` | on | Refuse a character whose own records disagree with each other |
+| `RefuseMods` | on | Judge what the client has loaded, by plugin GUID |
+| `ModPolicy` | `Allow` | `Allow`: only what this server runs plus `AllowedMods`. `Deny`: all but `DeniedMods` |
+| `AllowedMods` | *empty* | Extra GUIDs a client may run. This server's own plugins are always allowed |
+| `DeniedMods` | *empty* | GUIDs no client may run. Only read under `Deny` |
 | `RefuseUnreported` | on | Refuse a connection that answers nothing, or an unreadable profile |
 | `RefusedMessage` | *a sentence* | Sent to the refused client so it lands in their own log |
 | `ProtectCharacter` | on | The client-side guard, and the binding that feeds it |
@@ -266,11 +328,15 @@ the backup recovery above.
 
 ### New in 1.1, and untested
 
-The client-side guard on servers, the `dyrr` command, and the named bindings all **compile and
-have not been run in game**. The rule they apply is the one the menu guard has been applying
-correctly for a while; what is new is the moment it is applied at, and that moment has been
-read out of the game's own code rather than observed. Treat it as unproven until a character
-has actually been turned back at somebody else's server.
+Everything in 1.1 **compiles and has not been run in game**: the client-side guard on servers,
+the four extra cheat records, the mod check, the `dyrr` command and the named bindings.
+
+Two of those deserve to be treated with more suspicion than the rest. The client-side guard
+applies the same rule the menu guard has been applying correctly for a while, but at a new
+moment, and that moment was read out of the game's own code rather than observed - so it is
+unproven until a character has actually been turned back at somebody else's server. And
+`RefuseTampered` has never seen a tampered profile, for the same reason `RefuseCheats` never
+had: producing one takes deliberate work nobody has done here yet.
 
 ### Known gaps
 

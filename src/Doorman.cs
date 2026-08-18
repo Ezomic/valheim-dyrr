@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using HarmonyLib;
@@ -55,8 +56,13 @@ namespace Dyrr
         private struct Report
         {
             internal bool Readable;
+            internal int Format;
             internal bool Cheats;
+            internal float CheatStat;
+            internal int KnownWorlds;
+            internal List<string> Commands;
             internal List<long> Worlds;
+            internal List<string> Plugins;
         }
 
         [HarmonyPostfix]
@@ -71,14 +77,56 @@ namespace Dyrr
 
         private static void Receive(ZRpc rpc, ZPackage pkg)
         {
-            var report = new Report { Worlds = new List<long>() };
-
-            report.Readable = pkg.ReadBool();
-            if (report.Readable)
+            var report = new Report
             {
-                report.Cheats = pkg.ReadBool();
-                var count = pkg.ReadInt();
-                for (var i = 0; i < count; i++) report.Worlds.Add(pkg.ReadLong());
+                Worlds = new List<long>(),
+                Commands = new List<string>(),
+                Plugins = new List<string>(),
+            };
+
+            try
+            {
+                report.Readable = pkg.ReadBool();
+                if (report.Readable)
+                {
+                    report.Format = pkg.ReadInt();
+
+                    // A format this build cannot read is treated as no answer rather than
+                    // guessed at. Core's version gate refuses a mismatched build long before
+                    // this can happen; this is what says so if somebody is running without it.
+                    if (report.Format != Facts.Format)
+                    {
+                        DyrrPlugin.Log.LogWarning("A client reported facts in format " +
+                            report.Format + ", and this build speaks " + Facts.Format +
+                            ". Treating it as unreported. Install Core to have builds checked " +
+                            "before it gets this far.");
+
+                        report.Readable = false;
+                        Received[rpc] = report;
+                        return;
+                    }
+
+                    report.Cheats = pkg.ReadBool();
+                    report.CheatStat = pkg.ReadSingle();
+                    report.KnownWorlds = pkg.ReadInt();
+
+                    var commands = pkg.ReadInt();
+                    for (var i = 0; i < commands; i++) report.Commands.Add(pkg.ReadString());
+
+                    var worlds = pkg.ReadInt();
+                    for (var i = 0; i < worlds; i++) report.Worlds.Add(pkg.ReadLong());
+
+                    var plugins = pkg.ReadInt();
+                    for (var i = 0; i < plugins; i++) report.Plugins.Add(pkg.ReadString());
+                }
+            }
+            catch (Exception e)
+            {
+                // A package that runs out mid-read must not leave a half-filled report looking
+                // like a clean character. Unreadable is the honest answer and the server's
+                // own RefuseUnreported decides what that is worth.
+                DyrrPlugin.Log.LogWarning("Could not read a client's report: " + e.Message);
+                report.Readable = false;
             }
 
             Received[rpc] = report;
@@ -97,6 +145,8 @@ namespace Dyrr
 
             Report report;
             var heard = Received.TryGetValue(rpc, out report);
+
+            if (heard) LogWhatTheyBrought(report);
 
             var why = Verdict(__instance, heard, report);
             Verdicts[rpc] = why;
@@ -152,12 +202,97 @@ namespace Dyrr
             }
 
             if (DyrrConfig.RefuseCheats.Value && report.Cheats)
+                Also(reasons, "is flagged as having used cheats");
+
+            // A different record of the same thing, and the one a mod that clears the flag is
+            // least likely to have thought about: m_knownCommands gains every command's name a
+            // few lines below the flag in Terminal.ConsoleCommand.RunAction, outside the branch
+            // that sets it. Naming the command matters - "used cheats" is an accusation and
+            // "has run 'spawn'" is a fact somebody can answer.
+            if (DyrrConfig.RefuseCheatCommands.Value)
             {
-                if (reasons.Length > 0) reasons.Append(", ");
-                reasons.Append("is flagged as having used cheats");
+                var ran = CheatCommands.Among(report.Commands);
+                if (ran.Count > 0)
+                    Also(reasons, "has run " + Listed(ran, "cheat command"));
+            }
+
+            // The records disagreeing is the one signal here that does not need the client to
+            // be honest, only consistent. Both directions are chosen so the game itself cannot
+            // trip them: the counter is only ever incremented on the same line that sets the
+            // flag, and m_knownWorlds is written on save where m_worldData is written on spawn,
+            // so a character can legitimately have more of the second than the first but never
+            // the other way round.
+            if (DyrrConfig.RefuseTampered.Value)
+            {
+                if (!report.Cheats && report.CheatStat > 0f)
+                    Also(reasons, "says it has never cheated but carries a cheat count of " +
+                        report.CheatStat + " - that record has been altered");
+
+                if (report.KnownWorlds > report.Worlds.Count)
+                    Also(reasons, "has played in " + report.KnownWorlds + " world(s) by its own " +
+                        "history but admits to " + report.Worlds.Count +
+                        " - its travel record has been altered");
+            }
+
+            if (DyrrConfig.RefuseMods.Value)
+            {
+                var mods = Mods.Judge(report.Plugins);
+                if (mods != null) Also(reasons, mods);
             }
 
             return reasons.Length == 0 ? null : reasons.ToString();
+        }
+
+        /// <summary>
+        /// Write down every plugin the client brought that this server does not itself run,
+        /// whether or not it was refused for it.
+        ///
+        /// This is how AllowedMods and DeniedMods get filled in. Neither ships with anything in
+        /// it and neither could: a list of cheat mod GUIDs written in advance is out of date
+        /// the week after it ships and reads as complete when it is not. What an admin can
+        /// actually work from is what turned up at their own door, which is this. It logs on an
+        /// admitted client too, deliberately - the useful entry is usually somebody's map mod,
+        /// found before they are ever turned away for it.
+        /// </summary>
+        private static void LogWhatTheyBrought(Report report)
+        {
+            if (report.Plugins == null || report.Plugins.Count == 0) return;
+
+            var own = Mods.Own();
+            var extra = new List<string>();
+
+            foreach (var guid in report.Plugins)
+                if (guid != null && !own.Contains(guid.Trim().ToLowerInvariant())) extra.Add(guid);
+
+            if (extra.Count == 0) return;
+
+            DyrrPlugin.Log.LogInfo("A client brought " + extra.Count +
+                " plugin(s) this server does not run: " + string.Join(", ", extra.ToArray()));
+        }
+
+        private static void Also(StringBuilder reasons, string reason)
+        {
+            if (reasons.Length > 0) reasons.Append(", and ");
+            reasons.Append(reason);
+        }
+
+        /// <summary>"cheat command 'god'", or "3 cheat commands: 'god', 'fly', 'spawn'".</summary>
+        private static string Listed(List<string> items, string noun)
+        {
+            if (items.Count == 1) return noun + " '" + items[0] + "'";
+
+            var shown = Math.Min(items.Count, 3);
+            var text = items.Count + " " + noun + "s: ";
+
+            for (var i = 0; i < shown; i++)
+            {
+                if (i > 0) text += ", ";
+                text += "'" + items[i] + "'";
+            }
+
+            if (items.Count > shown) text += " and " + (items.Count - shown) + " more";
+
+            return text;
         }
 
         /// <summary>

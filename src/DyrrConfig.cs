@@ -15,6 +15,12 @@ namespace Dyrr
         internal static ConfigEntry<bool> Enforce;
         internal static ConfigEntry<bool> RefuseOtherWorlds;
         internal static ConfigEntry<bool> RefuseCheats;
+        internal static ConfigEntry<bool> RefuseCheatCommands;
+        internal static ConfigEntry<bool> RefuseTampered;
+        internal static ConfigEntry<bool> RefuseMods;
+        internal static ConfigEntry<string> ModPolicy;
+        internal static ConfigEntry<string> AllowedMods;
+        internal static ConfigEntry<string> DeniedMods;
         internal static ConfigEntry<bool> RefuseUnreported;
         internal static ConfigEntry<string> RefusedMessage;
         internal static ConfigEntry<bool> ProtectCharacter;
@@ -76,6 +82,79 @@ namespace Dyrr
             RefuseCheats = cfg.Bind("Door", "RefuseCheats", true,
                 "Refuse a character the game has flagged as having used cheats. Also " +
                 "permanent, and set by devcommands rather than by anything subtle.");
+
+
+            RefuseCheatCommands = cfg.Bind("Door", "RefuseCheatCommands", true,
+                "Refuse a character that has run a console command the game marks as a cheat."
+                + "\n"
+                + "Separate from RefuseCheats because it reads a different record. The game "
+                + "keeps the name of every command a character has ever run, in "
+                + "m_knownCommands, written a few lines after the cheats flag and outside the "
+                + "branch that sets it - so a mod that clears the flag leaves this behind. "
+                + "Which command was run is named in the log and in the refusal."
+                + "\n"
+                + "The classification is done here, from the server's own command table, so a "
+                + "cheat command added by another mod on this server counts too.");
+
+            RefuseTampered = cfg.Bind("Door", "RefuseTampered", true,
+                "Refuse a character whose own records disagree with each other."
+                + "\n"
+                + "The game writes the same facts in more than one place, at different moments, "
+                + "from different code: the cheats flag has a counter beside it, and the list "
+                + "of worlds a character has spawned in has a second list of world names "
+                + "written at save time. Clearing one is easy; clearing all of them so they "
+                + "still agree is different work, and a mod written to switch devcommands on "
+                + "has not done it."
+                + "\n"
+                + "This is the only check here that does not depend on the client being honest, "
+                + "only on it being consistent. A false positive would need a character whose "
+                + "profile the game itself wrote inconsistently, which has not been seen.");
+
+            RefuseMods = cfg.Bind("Mods", "RefuseMods", true,
+                "Judge what the joining client has loaded, by BepInEx plugin GUID."
+                + "\n"
+                + "This is the check that actually reaches cheating on a dedicated server. "
+                + "Console.IsCheatsEnabled returns ZNet.instance.IsServer(), so a client's own "
+                + "devcommands does nothing on somebody else's server - which means anyone "
+                + "cheating there is running a mod that patched around it. What the character "
+                + "did in the past is a weaker question than what the client is running now."
+                + "\n"
+                + "Self-reported like everything else here, so a purpose-built client can lie. "
+                + "What it catches is a cheat mod installed from Thunderstore by somebody who "
+                + "did not think about it.");
+
+            ModPolicy = cfg.Bind("Mods", "ModPolicy", Mods.Allow,
+                "Allow: only the mods this server runs, plus AllowedMods, may come in."
+                + "\n"
+                + "Deny: anything may come in except what is named in DeniedMods."
+                + "\n"
+                + "Allow is the default because a list of things to permit is knowable in "
+                + "advance and a list of every cheat mod that will ever exist is not. Deny "
+                + "suits a server that does not mind what people run as long as it is not that."
+                + "\n"
+                + "Whichever is set, nothing is refused while Enforce is off - it is reported, "
+                + "and 'dyrr' prints the standing answer for everyone connected. Turn Enforce "
+                + "on after reading that, not before.");
+
+            AllowedMods = cfg.Bind("Mods", "AllowedMods", "",
+                "Extra plugin GUIDs a client may run, separated by commas. Case is ignored."
+                + "\n"
+                + "The plugins this server itself runs are always allowed and do not need "
+                + "listing - otherwise adding a mod to the server would refuse everybody, "
+                + "including you. This is for the client-only ones: a map mod, an equipment "
+                + "bar, and whatever you personally develop with."
+                + "\n"
+                + "Only read when ModPolicy is Allow.");
+
+            DeniedMods = cfg.Bind("Mods", "DeniedMods", "",
+                "Plugin GUIDs no client may run, separated by commas. Case is ignored."
+                + "\n"
+                + "Shipped empty on purpose. A list of cheat mod GUIDs written by me would be "
+                + "out of date the week after it shipped and would read as complete when it "
+                + "was not. Build it from what actually turns up: every plugin a client brings "
+                + "that this server does not run is written to the log when it connects."
+                + "\n"
+                + "Only read when ModPolicy is Deny.");
 
             RefuseUnreported = cfg.Bind("Door", "RefuseUnreported", true,
                 "Refuse a connection that answers nothing, or whose profile could not be " +

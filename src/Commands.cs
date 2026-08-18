@@ -132,8 +132,27 @@ namespace Dyrr
                     : "Enforce is OFF - failures are reported here and refused to nobody.\n")
                 .Append("Checks: other worlds ").Append(On(DyrrConfig.RefuseOtherWorlds.Value))
                 .Append(", cheats ").Append(On(DyrrConfig.RefuseCheats.Value))
+                .Append(", cheat commands ").Append(On(DyrrConfig.RefuseCheatCommands.Value))
+                .Append(", tampered ").Append(On(DyrrConfig.RefuseTampered.Value))
                 .Append(", unreported ").Append(On(DyrrConfig.RefuseUnreported.Value))
                 .Append('\n');
+
+            text.Append("Mods: ");
+            if (!DyrrConfig.RefuseMods.Value)
+            {
+                text.Append("not checked\n");
+            }
+            else
+            {
+                var deny = DyrrConfig.ModPolicy.Value.Trim()
+                    .Equals(Mods.Deny, System.StringComparison.OrdinalIgnoreCase);
+
+                text.Append(deny ? "Deny" : "Allow").Append(" - ").Append(Mods.Own().Count)
+                    .Append(" plugin(s) run here and are always allowed, plus whatever is in ")
+                    .Append(deny ? "DeniedMods" : "AllowedMods")
+                    .Append(". Anything a client brings that this server does not run is ")
+                    .Append("logged as it connects, which is how those lists get filled in.\n");
+            }
 
             text.Append("Refused so far this session: ").Append(Doorman.RefusedCount).Append("\n\n");
 

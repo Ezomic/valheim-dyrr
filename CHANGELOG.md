@@ -45,6 +45,49 @@ against a real server.
   action this mod asks of a player is "delete the line starting with your character's id", and
   that is much harder when every line looks the same.
 
+- **Four more ways to see a cheat, because one flag is one thing to clear.** `RefuseCheats`
+  read `m_usedCheats`, a bool set in `Terminal.ConsoleCommand.RunAction`. A mod that switches
+  devcommands on will trip it; a mod that also clears it will not. So the client now reports
+  the records the game keeps beside it, written at different moments by different code:
+
+  - `PlayerStatType.Cheats`, a counter incremented on the line after the flag. Flag clear and
+    counter above zero is not a suspicion, it is a record that has been edited.
+  - `m_knownCommands`, the name of every console command the character has ever run, written a
+    few lines further down and **outside** the branch that sets the flag. New setting
+    `RefuseCheatCommands`, and the refusal names the command - "has run 'spawn'" is a fact
+    somebody can answer where "used cheats" is only an accusation.
+  - `m_knownWorlds`, worlds by name at save time, against `m_worldData`'s uids at spawn time.
+    More names than uids means the travel record was scrubbed. The inequality only runs one
+    way, so the game itself cannot trip it.
+
+  The last two are `RefuseTampered`, on by default. It is the only check here that does not
+  need the client to be honest, only consistent - and consistency across four records written
+  by four pieces of code is a different job from clearing one bool.
+
+  Which commands count as cheats is decided **on the server**, from the server's own command
+  table, so a cheat command added by some other mod counts for free. The table is only built
+  when a console exists, which a dedicated server has no guarantee of, so there is a fallback
+  list of all 73 vanilla `isCheat: true` commands - ripped out of `Terminal.InitTerminal`
+  rather than typed from memory.
+
+- **The client's mod list, judged by the server.** `RefuseMods`, on by default, with
+  `ModPolicy` at `Allow`: the plugins the server itself runs are always fine, anything else has
+  to be named in `AllowedMods`. `Deny` inverts it for a server that only wants to name what it
+  will not have.
+
+  This is the check that actually reaches cheating on a dedicated server, and the reason is one
+  line of vanilla: `Console.IsCheatsEnabled` returns `ZNet.instance.IsServer()`. A client's own
+  `devcommands` is inert on somebody else's server - it flips a bool the gate then ignores - so
+  anybody cheating there is necessarily running a mod that patched around it. What a character
+  did in the past is a weaker question than what the client is running now.
+
+  Both lists ship **empty**, and `DeniedMods` could not honestly ship otherwise: a list of cheat
+  mod GUIDs written in advance is stale the week after and reads as complete when it is not.
+  Every plugin a client brings that the server does not run is written to the log as it
+  connects, admitted or not, which is what those lists get built from.
+
+  Self-reported, like everything else here. A purpose-built client can lie about all of it.
+
 ### Fixed
 
 - **A hand edit to `dyrr-home.txt` was silently undone.** The file was read once per process
