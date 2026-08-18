@@ -3,6 +3,58 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.1.0] - 2026-08-18
+
+The preventive half now covers servers, which is what it was always supposed to do.
+
+**Built, not yet run in game.** Everything below compiles and nothing here has been tested
+against a real server.
+
+### Added
+
+- **The client refuses a join into the wrong world, whatever the server does.** Until now the
+  only thing standing between a character and a server that would ruin it was that server
+  choosing to enforce, because a server's world identity is not known in the menu and there was
+  nothing to check. There is one moment on the join path where it is known and nothing has been
+  written yet - the client reads the world name, seed and uid inside `ZNet.RPC_PeerInfo`, and
+  the permanent record this mod exists to prevent is only ever written by
+  `PlayerProfile.GetWorldData`, which needs a spawned player. So the check goes there, and the
+  connection is dropped the way vanilla drops a kicked one.
+
+  This closes the hole the previous README described and left open: a non-enforcing server
+  ruining a character that a different server would then refuse forever. It works whether or
+  not the server runs this mod at all. New setting `ProtectOnServers`, on by default, under
+  `ProtectCharacter`.
+
+- **A `dyrr` console command.** `dyrr` prints what the door is doing here: the world, whether
+  Enforce is on, which checks are live, how many connections have been refused this session,
+  and the standing verdict for every player currently connected. That last part is the point of
+  Enforce being off - it is meant to be sat in while deciding, and until now it answered "who
+  would stop being able to play?" one line at a time into a log, at the moment each player
+  connected. On a server the report is written to the BepInEx log as well, because a console
+  scrolls and a log file does not.
+
+  `dyrr home` lists this machine's character bindings, and `dyrr forget <id>` unbinds one
+  without going and finding the file. Neither is a cheat command and neither is admin-gated:
+  the report is the server's own state to whoever is already at its console, and the bindings
+  are this machine's own file.
+
+- **`dyrr-home.txt` now carries the character and world names** beside the two ids, and the
+  refusal popup names the world rather than quoting a bare 19-digit number. Nothing is ever
+  matched on the names - two fields still load, four still load on an older build - but the one
+  action this mod asks of a player is "delete the line starting with your character's id", and
+  that is much harder when every line looks the same.
+
+### Fixed
+
+- **A hand edit to `dyrr-home.txt` was silently undone.** The file was read once per process
+  and the whole set written back on every bind, so deleting a line - the documented fix for a
+  wrong binding, and what the refusal popup tells you to do - was reverted by the next
+  character that bound. It is now re-read whenever it changes on disk, so the file the popup
+  points at is the file that is actually read, and the edit can be made without restarting.
+
+- `Home.Forget` existed and nothing called it. It is `dyrr forget` now.
+
 ## [1.0.0] - 2026-08-18
 
 First published release.

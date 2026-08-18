@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Text;
 using HarmonyLib;
 
@@ -28,6 +27,30 @@ namespace Dyrr
         /// <summary>What each connection told us, keyed by ZRpc - the only identity that
         /// exists this early, since ZNetPeer is not set up until PeerInfo.</summary>
         private static readonly Dictionary<ZRpc, Report> Received = new Dictionary<ZRpc, Report>();
+
+        /// <summary>
+        /// The verdict reached for each connection, null where the character was admitted.
+        ///
+        /// Kept purely so the door can be asked what it is doing rather than only reporting it
+        /// one line at a time into a log. That matters most with Enforce off, which is the
+        /// setting an admin is supposed to sit on while deciding: without a way to see the
+        /// whole picture, "off and reporting" means reading a log for lines that scrolled past
+        /// while nobody was watching. See Commands.
+        /// </summary>
+        private static readonly Dictionary<ZRpc, string> Verdicts = new Dictionary<ZRpc, string>();
+
+        /// <summary>How many connections have actually been turned away since startup.</summary>
+        internal static int RefusedCount;
+
+        /// <summary>Client side: the last reason a server gave for refusing this machine.</summary>
+        internal static string LastRefusal;
+
+        /// <summary>The verdict for a live connection: null when it was admitted, and false
+        /// when the door never judged it at all (disabled, or not the server).</summary>
+        internal static bool TryVerdict(ZRpc rpc, out string why)
+        {
+            return Verdicts.TryGetValue(rpc, out why);
+        }
 
         private struct Report
         {
@@ -76,6 +99,7 @@ namespace Dyrr
             var heard = Received.TryGetValue(rpc, out report);
 
             var why = Verdict(__instance, heard, report);
+            Verdicts[rpc] = why;
             if (why == null) return true;
 
             if (!DyrrConfig.Enforce.Value)
@@ -85,6 +109,7 @@ namespace Dyrr
             }
 
             DyrrPlugin.Log.LogWarning("Refused a connection: " + why);
+            RefusedCount++;
 
             // Tell them before dropping them. The reason travels to the client so it lands in
             // *their* log, because Valheim's refusal screen carries no text of its own and a
@@ -152,20 +177,8 @@ namespace Dyrr
         {
             DyrrPlugin.Log.LogError("This server refused your character: " + why);
 
-            if (DyrrPlugin.CorePresent) ExplainOnScreen(why);
-        }
-
-        /// <summary>
-        /// Never inlined, for the same reason as DyrrPlugin.RegisterWithCore: the JIT
-        /// resolves a method's assemblies when it first compiles that method, so this call
-        /// sitting inline in OnRefused would drag Ezomic.Core in on a machine that has no Core
-        /// - turning a refusal that should have been explained in the log into an exception
-        /// inside an RPC handler.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ExplainOnScreen(string why)
-        {
-            Ezomic.Core.Suite.ExplainRefusal(why);
+            LastRefusal = why;
+            DyrrPlugin.Explain(why);
         }
 
         /// <summary>A connection that is gone cannot be asked about again.</summary>
@@ -173,7 +186,10 @@ namespace Dyrr
         [HarmonyPatch(typeof(ZNet), "Disconnect")]
         private static void Forget(ZNetPeer peer)
         {
-            if (peer != null && peer.m_rpc != null) Received.Remove(peer.m_rpc);
+            if (peer == null || peer.m_rpc == null) return;
+
+            Received.Remove(peer.m_rpc);
+            Verdicts.Remove(peer.m_rpc);
         }
     }
 }

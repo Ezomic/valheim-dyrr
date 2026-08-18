@@ -18,6 +18,7 @@ namespace Dyrr
         internal static ConfigEntry<bool> RefuseUnreported;
         internal static ConfigEntry<string> RefusedMessage;
         internal static ConfigEntry<bool> ProtectCharacter;
+        internal static ConfigEntry<bool> ProtectOnServers;
 
         internal static void Bind(ConfigFile cfg)
         {
@@ -39,6 +40,23 @@ namespace Dyrr
                 + "against you.\n"
                 + "It refuses rather than asking, because a confirm dialog on an irreversible "
                 + "action is just a button for doing the unfixable thing.");
+
+            // On by default, and it is a behaviour change for anyone upgrading, so it is worth
+            // being plain about why it is not opt-in. Until this existed, ProtectCharacter
+            // covered local worlds only and a character could still be ruined by joining any
+            // server that was not enforcing - which is not a hypothetical, it is how a
+            // character was ruined here by the lenient one of two servers running side by
+            // side. Leaving the hole open by default would mean the protective half of the mod
+            // still did not protect the ordinary case.
+            ProtectOnServers = cfg.Bind("Protect", "ProtectOnServers", true,
+                "Extend the check above to servers: leave the connection before spawning if "
+                + "the server's world is not the one this character belongs to.\n"
+                + "This works whatever the server does, and whether or not the server runs "
+                + "this mod at all. It is the same rule the menu applies to local worlds, "
+                + "moved to the one moment on a join where the world is known and nothing has "
+                + "been written yet.\n"
+                + "Turn it off if you deliberately take one character between several worlds. "
+                + "Note that doing so is exactly what the door refuses people for.");
 
             Enforce = cfg.Bind("Door", "Enforce", false,
                 "On refuses the connection. Off only logs what would have been refused.\n" +

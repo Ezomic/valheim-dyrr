@@ -44,14 +44,14 @@ namespace Dyrr
             if (world == null || profile == null) return true;
 
             var id = Home.IdOf(profile);
-            var home = Home.Get(id);
+            var home = Home.GetBinding(id);
 
             // Nothing recorded means nothing to protect yet - the character has not been
             // accepted anywhere, so any world is a legitimate first one.
-            if (id == 0L || home == 0L || home == world.m_uid) return true;
+            if (id == 0L || home.World == 0L || home.World == world.m_uid) return true;
 
             DyrrPlugin.Log.LogWarning("Character '" + profile.GetName() + "' (" + id +
-                ") belongs to world " + home + " but is being started in world '" +
+                ") belongs to world " + Home.Describe(home) + " but is being started in world '" +
                 world.m_name + "' (" + world.m_uid + "). Refused.");
 
             // Everything needed to diagnose or override this, since there is no way through it
@@ -60,12 +60,13 @@ namespace Dyrr
                 "Dyrr: wrong world for this character",
                 "Character: " + profile.GetName() + "  (id " + id + ")\n" +
                 "This world: " + world.m_name + "  (" + world.m_uid + ")\n" +
-                "Belongs to world: " + home + "\n\n" +
+                "Belongs to world: " + Home.Describe(home) + "\n\n" +
                 "Loading it here records this world permanently in the character and locks it " +
                 "out of its own server. The only undo is restoring a backup, so this is refused " +
                 "rather than confirmed.\n\n" +
                 "If the binding is wrong, delete the line starting " + id + " from " +
-                "BepInEx/config/dyrr-home.txt.",
+                "BepInEx/config/dyrr-home.txt. You can do that now, without restarting - the " +
+                "file is re-read whenever it changes.",
                 UnifiedPopup.Pop,
                 localizeText: false));
 

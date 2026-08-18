@@ -38,7 +38,7 @@ namespace Dyrr
     {
         public const string PluginGuid = "ezomic.valheim.dyrr";
         public const string PluginName = "Dyrr";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
         public const string PluginAuthor = "Robbin Thijssen";
 
         /// <summary>Core's plugin GUID. Optional - see TryRegisterWithCore.</summary>
@@ -75,6 +75,8 @@ namespace Dyrr
             _harmony = new Harmony(PluginGuid);
             _harmony.PatchAll(typeof(Doorman));
             _harmony.PatchAll(typeof(MenuGuard));
+            _harmony.PatchAll(typeof(Warden));
+            _harmony.PatchAll(typeof(Commands));
 
 
             Log.LogInfo(PluginName + " " + PluginVersion + " by " + PluginAuthor + " - ready.");
@@ -130,7 +132,7 @@ namespace Dyrr
 
             _lastId = id;
             _lastWorld = uid;
-            Home.Bind(id, profile.GetName(), uid);
+            Home.Bind(id, profile.GetName(), uid, ZNet.instance.GetWorldName());
         }
 
         private static long _lastId;
@@ -203,6 +205,25 @@ namespace Dyrr
             }
 
             RegisterWithCore();
+        }
+
+        /// <summary>
+        /// Put a reason on the refusal screen, when there is a Core installed to draw it.
+        ///
+        /// Both halves of the door need this - the server-side one to explain a refusal that
+        /// came over the wire, the client-side one to explain a join it stopped itself - and
+        /// the Core-present check has to sit here, outside the call, rather than in each of
+        /// them. See RegisterWithCore for why the call itself is isolated.
+        /// </summary>
+        internal static void Explain(string why)
+        {
+            if (CorePresent) ExplainOnScreen(why);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ExplainOnScreen(string why)
+        {
+            Suite.ExplainRefusal(why);
         }
 
         /// <summary>

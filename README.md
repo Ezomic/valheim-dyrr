@@ -47,9 +47,12 @@ done. Loading a character into any world writes that world into `PlayerProfile.m
 permanently. Refusing the connection afterwards tells you about a mistake you can no longer
 undo.
 
-So the other half runs on the client, in the menu: **it refuses to start a local world with a
-character that belongs to a different one**. `FejdStartup.OnWorldStart` is the commit point and
-the last moment anything can be done.
+So the other half runs on the client, and **it refuses to take a character into a world that is
+not its own** - a local world or somebody else's server, whether or not that server runs this
+mod. For a local world the commit point is `FejdStartup.OnWorldStart`, in the menu. For a
+server there is no equivalent in the menu, because a server's world identity is not known until
+after connecting; the check goes at the one moment on the join path where the world is known
+and nothing has been written yet, and leaves before the character spawns.
 
 It refuses rather than asking. A confirm dialog was tried and rejected: the damage is
 irreversible, so a prompt is just a button for doing the unfixable thing by clicking through
@@ -61,10 +64,18 @@ Each character is bound to the first world it is accepted in, recorded in
 lets you damage your own character, which is why it is plain text you can open and fix. Nothing
 that turns *other people* away is ever read from the client.
 
-Only local worlds are covered by the menu guard, because a server's world identity is not known
-until after connecting. That path is not unguarded: it is the door, which refuses before the
-character ever spawns. The two halves cover each other, which is exactly why they belong in one
-mod. This used to live in Rist, warning about a lockout Rist had no part in.
+The server case is worth spelling out, because it is where the window is narrow. The client
+learns which world it is joining inside `ZNet.RPC_PeerInfo`, which reads the world name, seed
+and uid straight off the wire. The permanent record - the entry in
+`PlayerProfile.m_worldData` - is only ever written by `PlayerProfile.GetWorldData`, reached
+from the logout point, the map data and the spawn point, all of which need a player who has
+spawned. Between those two facts there is a window, and this is the whole of it. Leaving is
+what vanilla itself does when you are kicked: set the connection status, drop the peer. The
+logout that follows saves nothing, because `Game.SavePlayerProfile` does nothing at all
+without a local player and there is not one yet.
+
+So the door and the guard now cover the same ground from both sides, which is exactly why they
+belong in one mod. This used to live in Rist, warning about a lockout Rist had no part in.
 
 ## What it checks
 
@@ -138,6 +149,46 @@ This is a house rule with a lock on the door, not a security boundary. Core's ve
 makes it meaningful by refusing clients that do not have the plugin at all, but a client that
 has it and has been modified is beyond what any of this can see.
 
+## Asking the door what it is doing
+
+`Enforce` off is not a disabled state. It is the state an admin is meant to sit in while
+deciding: every connection is still judged and what would have happened is still reported. The
+trouble was that it reported one line at a time into a log, at the moment each player
+connected, so the question actually being asked - *if I turn this on, who stops being able to
+play?* - could only be answered by reading back through a log for lines that scrolled past
+while nobody was watching.
+
+`dyrr` in the console answers it standing:
+
+```
+Dyrr 1.1.0
+World: 'midgard' (-4881...)
+Enforce is OFF - failures are reported here and refused to nobody.
+Checks: other worlds on, cheats on, unreported on
+Refused so far this session: 0
+
+  Ragnar  admitted
+  Sigrun  would refuse: has played on 2 other world(s)
+```
+
+On a server the same block goes to `BepInEx/LogOutput.log`, because a console scrolls and a log
+file does not. On a client it reports what that machine knows instead: whether a server has
+refused it this session, and why.
+
+Two more:
+
+- `dyrr home` - which world each character on this machine belongs to, by name as well as id.
+- `dyrr forget <id>` - unbind a character, so the next world it plays in becomes its new home.
+  This does not undo anywhere it has already been; the game's record of that is permanent and
+  no mod can clear it.
+
+Neither is a cheat command and neither is admin-gated, because neither reads or changes
+anything that was not already open to whoever can run it: the report is the server's own state
+to somebody already at its console, and the bindings are this machine's own text file.
+
+The console needs Valheim's `-console` launch argument on a client. A dedicated server has one
+already.
+
 ## Settings
 
 The file is `BepInEx/config/ezomic.valheim.dyrr.cfg`. Every entry carries a comment explaining
@@ -151,7 +202,8 @@ itself, so the file is the reference; this is the map.
 | `RefuseCheats` | on | Refuse a character the game has flagged for `devcommands` use |
 | `RefuseUnreported` | on | Refuse a connection that answers nothing, or an unreadable profile |
 | `RefusedMessage` | *a sentence* | Sent to the refused client so it lands in their own log |
-| `ProtectCharacter` | on | The client-side menu guard, and the binding that feeds it |
+| `ProtectCharacter` | on | The client-side guard, and the binding that feeds it |
+| `ProtectOnServers` | on | Extend that guard to servers: leave a join into the wrong world before spawning |
 
 Note the standing BepInEx behaviour: every entry is written to disk on the first run and the
 saved value beats a new default in code. Changing a default in a later version does nothing on
@@ -167,14 +219,12 @@ Registers with Core at `Requirement.Everyone`. Not because clients decide anythi
 server does, but because the facts being judged live on the client and have to be reported,
 so a client without the plugin answers nothing.
 
-## Every server must enforce, or the halves stop covering each other
+## Running more than one server
 
-This is the one thing to understand before running more than one server.
-
-The menu guard covers **local worlds only**; a server's world identity is not known until
-after connecting. The door covers **servers**, but only where `Enforce` is on. So a
-non-enforcing server is a hole: a character belonging to another world walks in, the game
-writes that world into its profile, and the mod can then do nothing but log
+This used to be a warning, and it was the mod's worst hole. The guard covered local worlds
+only, and the door covered servers only where `Enforce` was on - so a non-enforcing server was
+a gap a character walked straight into. The game wrote that world into the profile, and the mod
+could do nothing but log
 
 > Character 'X' is bound to world A but is in world B. Too late to stop it - that world is now
 > written into the character.
@@ -182,13 +232,13 @@ writes that world into its profile, and the mod can then do nothing but log
 Which is exactly what happened the first time two servers ran here, one enforcing and one not.
 The character was ruined by the server that was being lenient.
 
-So: if you run a test server alongside a real one, **enforce on both**, and keep a separate
-character for each. One character, one server, permanently.
+**As of 1.1 the client refuses that join itself**, before spawning, whatever the server does
+and whether or not the server runs this mod. That is what `ProtectOnServers` is, and it is on
+by default. The hole is closed from the side that has something to lose.
 
-If you ever need a genuinely non-enforcing server, the fix is a client-side check in
-`ZNet.RPC_PeerInfo`, where the world uid is known, before the player spawns, so the character
-could be protected whatever the server does. Not implemented, because enforcing everywhere is
-simpler and was enough.
+The advice has not changed, because a lock is not a reason to stop being careful: keep a
+separate character per server. One character, one world, permanently. What has changed is that
+forgetting to do so is no longer irreversible.
 
 ## Recovering a ruined character
 
@@ -197,11 +247,12 @@ admitted again. This is the only way back, and it has been done: a character ref
 having visited another world came back from backup and was let in.
 
 Note the backup does not touch `dyrr-home.txt`, which lives beside the config rather than
-with the character. A restored character can therefore carry a stale home. That is harmless,
+with the character - `dyrr forget <id>`, or deleting that character's line, clears the binding
+if it is now wrong. A restored character can therefore carry a stale home. That is harmless,
 a home pointing at a server world matches no local world, so the menu guard simply refuses all
 of them, which errs toward protection, but the world id quoted in the popup may be the old one.
 
-## Status: v1.0
+## Status: v1.1
 
 **Both branches have been run against a real dedicated server.** It refuses a character that
 has been elsewhere, with the reason on the client's own screen and in its own log; and it
@@ -212,6 +263,14 @@ the mod is counting worlds that are not this one, and that is now confirmed in b
 
 Also confirmed: the menu guard's binding, the adoption of bindings from the old home file, and
 the backup recovery above.
+
+### New in 1.1, and untested
+
+The client-side guard on servers, the `dyrr` command, and the named bindings all **compile and
+have not been run in game**. The rule they apply is the one the menu guard has been applying
+correctly for a while; what is new is the moment it is applied at, and that moment has been
+read out of the game's own code rather than observed. Treat it as unproven until a character
+has actually been turned back at somebody else's server.
 
 ### Known gaps
 
