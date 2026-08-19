@@ -91,6 +91,14 @@ namespace Dyrr
             if (ZNet.instance != null && ZNet.instance.IsServer()) DyrrPlugin.Log.LogInfo(text);
         }
 
+        /// <summary>
+        /// Every line here is a short label and a value, and it has to stay that way: the
+        /// console does not wrap, so a sentence runs off the right edge of the screen and the
+        /// end of it is simply not there. The mod policy line was a paragraph explaining how
+        /// AllowedMods gets filled in, and it was cut mid-word. That explanation belongs in the
+        /// config comment and the README, which are read deliberately, rather than in a report
+        /// somebody is scanning.
+        /// </summary>
         private static string Status()
         {
             var text = new StringBuilder();
@@ -148,10 +156,8 @@ namespace Dyrr
                     .Equals(Mods.Deny, System.StringComparison.OrdinalIgnoreCase);
 
                 text.Append(deny ? "Deny" : "Allow").Append(" - ").Append(Mods.Own().Count)
-                    .Append(" plugin(s) run here and are always allowed, plus whatever is in ")
-                    .Append(deny ? "DeniedMods" : "AllowedMods")
-                    .Append(". Anything a client brings that this server does not run is ")
-                    .Append("logged as it connects, which is how those lists get filled in.\n");
+                    .Append(" run here, plus ").Append(deny ? "DeniedMods" : "AllowedMods")
+                    .Append("\n");
             }
 
             text.Append("Refused so far this session: ").Append(Doorman.RefusedCount).Append("\n\n");
