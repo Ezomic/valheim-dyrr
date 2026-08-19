@@ -165,7 +165,11 @@ namespace Dyrr
             // *their* log, because Valheim's refusal screen carries no text of its own and a
             // player on somebody else's server can never read the server's log. Being told
             // which rule you broke is the difference between a door and a mystery.
-            rpc.Invoke(RpcRefused, DyrrConfig.RefusedMessage.Value + " (" + why + ")");
+            // "It" plus the reason, because every reason is phrased as something the
+            // connection did or is - "has played on 2 other world(s)", "is running 'x'". A
+            // parenthesis after a fixed sentence read as an aside on that sentence, which is
+            // how a mod refusal ended up presented as a travel refusal.
+            rpc.Invoke(RpcRefused, DyrrConfig.RefusedMessage.Value + " It " + why + ".");
             rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorKicked);
             return false;
         }
@@ -310,7 +314,7 @@ namespace Dyrr
         /// </summary>
         private static void OnRefused(ZRpc rpc, string why)
         {
-            DyrrPlugin.Log.LogError("This server refused your character: " + why);
+            DyrrPlugin.Log.LogError("This server refused this connection: " + why);
 
             LastRefusal = why;
             DyrrPlugin.Explain(why);

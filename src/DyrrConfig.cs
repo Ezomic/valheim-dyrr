@@ -163,11 +163,18 @@ namespace Dyrr
                 "this plugin, so in practice this is a backstop.");
 
             RefusedMessage = cfg.Bind("Door", "RefusedMessage",
-                "This server only accepts characters that have never played anywhere else.",
-                "Sent to the refused client so it lands in their own log. Valheim's refusal " +
-                "screen carries no text of its own, and a player on somebody else's server " +
-                "can never read that server's log - so without this, being turned away is " +
-                "indistinguishable from a crash.");
+                "This server refused this connection.",
+                "Sent to the refused client so it lands in their own log, and on their " +
+                "screen when they have Core. Valheim's refusal screen carries no text of its " +
+                "own, and a player on somebody else's server can never read that server's " +
+                "log - so without this, being turned away is indistinguishable from a crash.\n" +
+                "The specific reason is appended to whatever this says, as a sentence starting " +
+                "\"It\". So keep this one general. It used to read \"only accepts characters " +
+                "that have never played anywhere else\", which was true when travel was the " +
+                "only thing that could refuse anybody and became a lie the moment it was not: " +
+                "a client turned away for running a mod was told, on screen, that its " +
+                "character had played somewhere else. A fixed sentence must not claim which " +
+                "of six checks fired.");
         }
     }
 }

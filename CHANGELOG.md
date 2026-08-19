@@ -118,6 +118,19 @@ against a real server.
 
   Self-reported, like everything else here. A purpose-built client can lie about all of it.
 
+- **The refusal message claimed which check had fired, and was usually wrong.**
+  `RefusedMessage` defaulted to *"This server only accepts characters that have never played
+  anywhere else"* and the specific reason was appended in brackets after it. That was true when
+  travel was the only thing that could refuse anybody. With six checks it became a lie on
+  screen: a client turned away for running a mod was told its character had played somewhere
+  else, with the real reason sitting in a parenthesis reading like an aside on the sentence
+  that contradicted it. Seen exactly that way on a dev server.
+
+  The default is now *"This server refused this connection."* and the reason follows as its own
+  sentence starting "It", which reads correctly for every check - *It is running 'x'*, *It has
+  played on 2 other world(s)*, *It has run cheat command 'god'*. A fixed sentence must not
+  claim which of six checks fired.
+
 ### Fixed
 
 - **A hand edit to `dyrr-home.txt` was silently undone.** The file was read once per process
