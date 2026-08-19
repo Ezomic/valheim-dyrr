@@ -170,6 +170,27 @@ Which commands count as cheats is decided **on the server**, from the server's o
 table, so a cheat command added by another mod counts for free and the client has no say in the
 rule it is judged by.
 
+### A cheat that never touches the console leaves no mark
+
+Proven here rather than reasoned about. Devkit - one of my own mods - has a god mode switch
+that calls `player.SetGodMode` directly. It does not go through
+`Terminal.ConsoleCommand.RunAction`, so **none of the four records above are written**: no
+flag, no counter, no command name. A character that had just used it came to an enforcing
+server and the character checks found nothing, correctly, because there was nothing there.
+
+That is not a gap in those checks, it is their shape. They catch cheating that went through
+the console, which is the only kind vanilla can do and the kind a `devcommands`-enabling mod
+does. A mod that flips the state itself is invisible to every record the game keeps.
+
+Which is the whole reason `RefuseMods` exists, and on that same connection it is what saw it:
+
+```
+A client brought 1 plugin(s) this server does not run: ezomic.valheim.devkit
+```
+
+It was admitted only because that GUID is in `AllowedMods`. Ask what the client is running,
+not only what the character has done.
+
 ### The limit, stated plainly
 
 `PlayerProfile` lives on the client, so **everything here is self-reported**, the mod list
