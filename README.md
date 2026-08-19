@@ -377,14 +377,28 @@ unproven until a character has actually been turned back at somebody else's serv
 `RefuseTampered` has never seen a tampered profile, for the same reason `RefuseCheats` never
 had: producing one takes deliberate work nobody has done here yet.
 
+### `RefuseCheats` has now fired
+
+It shipped in 1.0.0 on by default having never once triggered, which was disclosed here as the
+one gap. It needed a character deliberately flagged by `devcommands`, and nothing until now had
+produced one. On 2026-08-19 something did: `devcommands` then `god` in the console, quit to the
+menu, join an enforcing server.
+
+```
+Refused a connection: is flagged as having used cheats, and has run cheat command 'god'
+```
+
+Both cheat checks in one refusal, on screen and in both logs. Worth noting what the same test
+proved about the check next to it: the first attempt used a mod's god-mode button rather than
+the console and set none of the records, which is the distinction the
+[cheating section](#on-cheating-and-what-a-door-can-actually-do-about-it) is about.
+
 ### Known gaps
 
-**`RefuseCheats` has never fired.** It needs a character deliberately flagged by `devcommands`,
-and no test so far has produced one. The code path is three lines and shares the reporting and
-refusal machinery that the other two checks have exercised thoroughly, so the risk is that it
-never triggers rather than that it triggers wrongly. It is on by default. If you would rather
-not run an untested check, set `RefuseCheats = false`; the other two are the ones doing the
-work.
+**`RefuseTampered` has never fired**, for the same reason `RefuseCheats` had not: producing a
+profile whose own records disagree takes deliberate work nobody has done. It is on by default.
+Unlike the others it cannot be triggered by playing the game wrong - only by editing a save -
+so the risk is that it never triggers rather than that it triggers wrongly.
 
 The migration from the Threshold-era files is **confirmed working**, on a real run: the config
 came across with all seven values intact, the character bindings came across in full, and both
