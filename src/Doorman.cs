@@ -58,6 +58,7 @@ namespace Dyrr
             internal bool Readable;
             internal int Format;
             internal bool Cheats;
+            internal string Name;
             internal float CheatStat;
             internal int KnownWorlds;
             internal List<string> Commands;
@@ -106,6 +107,8 @@ namespace Dyrr
                         return;
                     }
 
+                    report.Name = pkg.ReadString();
+
                     report.Cheats = pkg.ReadBool();
                     report.CheatStat = pkg.ReadSingle();
                     report.KnownWorlds = pkg.ReadInt();
@@ -133,6 +136,40 @@ namespace Dyrr
         }
 
         /// <summary>
+        /// Who was at the door, as name and platform id.
+        ///
+        /// Both halves, because each covers the other's gap. The character name is what the
+        /// other players know and the only one worth reading in a Discord channel, but it is
+        /// self-reported and a character can be renamed; the platform id comes off the socket,
+        /// cannot be chosen, and is the one that survives a report that failed to parse.
+        ///
+        /// Neither is required. A client that sent no readable report still has a socket, and
+        /// in the worst case this says "someone", which is what the line used to say always.
+        /// </summary>
+        private static string Who(ZRpc rpc, bool heard, Report report)
+        {
+            var name = heard && !string.IsNullOrEmpty(report.Name) ? report.Name : null;
+
+            string id = null;
+            try
+            {
+                var socket = rpc == null ? null : rpc.GetSocket();
+                if (socket != null) id = socket.GetHostName();
+            }
+            catch (Exception)
+            {
+                // A socket that cannot name itself is not a reason to refuse to log the
+                // refusal. This whole method is decoration on a decision already made.
+            }
+
+            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(id)) return name + " (" + id + ")";
+            if (!string.IsNullOrEmpty(name)) return name;
+            if (!string.IsNullOrEmpty(id)) return id;
+
+            return "someone";
+        }
+
+        /// <summary>
         /// The decision. Only the server can act on it; a client that receives this is simply
         /// answering the server's question and has nothing to decide.
         /// </summary>
@@ -152,13 +189,18 @@ namespace Dyrr
             Verdicts[rpc] = why;
             if (why == null) return true;
 
+            var who = Who(rpc, heard, report);
+
             if (!DyrrConfig.Enforce.Value)
             {
-                DyrrPlugin.Log.LogWarning("Would have refused a connection: " + why);
+                DyrrPlugin.Log.LogWarning("Would have refused a connection: " + who + " " + why);
                 return true;
             }
 
-            DyrrPlugin.Log.LogWarning("Refused a connection: " + why);
+            // The name goes in the log line and NOT into `why`. That string is also sent to
+            // the client and shown to them, and telling somebody their own name back is noise
+            // - they know who they are, they want to know which rule they broke.
+            DyrrPlugin.Log.LogWarning("Refused a connection: " + who + " " + why);
             RefusedCount++;
 
             // Tell them before dropping them. The reason travels to the client so it lands in

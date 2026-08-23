@@ -3,6 +3,38 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.1.1] - 2026-08-23
+
+**A refusal says who was turned away.** The line was "Refused a connection: has played on 1
+other world(s)", which is fine in a server log you are reading beside the connection you just
+watched fail, and useless the moment it is forwarded to Discord - where it arrives as a rule
+nobody can attach to a person.
+
+It now reads:
+
+    Refused a connection: Balder (76561198662440314) has played on 1 other world(s)
+
+Both halves, because each covers the other's gap. The character name is what the other players
+know and the only part worth reading in a channel, but it is self-reported and a character can
+be renamed. The platform id comes off the socket, cannot be chosen, and survives a report that
+failed to parse.
+
+The name is **not** added to the reason sent back to the client. That string is shown to the
+person being refused, and telling somebody their own name back is noise - they know who they
+are, they want to know which rule they broke.
+
+### Why it was missing
+
+`Judge` is a **prefix** on `ZNet.RPC_PeerInfo`, so it runs before vanilla has parsed the
+package the player's name arrives in. All it holds at that moment is the socket. The name
+therefore had to come from Dyrr's own report, which the client sends first - so the report
+format moves to **3** and the name is the first field after the version, deliberately:
+everything below it can throw on a read and leave the report unreadable, and a report that
+failed halfway is exactly the one worth naming.
+
+A format mismatch was already handled and still is, with the same clear line rather than a
+garbled read.
+
 ## [1.1.0] - 2026-08-18
 
 The preventive half now covers servers, which is what it was always supposed to do.

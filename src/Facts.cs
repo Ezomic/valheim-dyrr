@@ -43,7 +43,10 @@ namespace Dyrr
         /// a garbled read - Core's version gate should have refused the connection long before
         /// this could happen, and this is what says so if it did not.
         /// </summary>
-        internal const int Format = 2;
+        // 3 as of 2026-08-23: the character's own name rides along, so a refusal can say who
+        // was turned away instead of only why. A server log line nobody can act on is a log
+        // line nobody reads, and this one is forwarded to Discord where "somebody" is useless.
+        internal const int Format = 3;
 
         private static System.Reflection.FieldInfo _worldData;
 
@@ -67,12 +70,18 @@ namespace Dyrr
             var cheats = false;
             var cheatStat = 0f;
             var knownWorlds = 0;
+            var name = "";
 
             try
             {
                 var profile = Game.instance != null ? Game.instance.GetPlayerProfile() : null;
                 if (profile != null)
                 {
+                    // The character's name, not the Steam persona. It is the name the other
+                    // players know, and it is the one the door policy is actually about: this
+                    // mod refuses characters, not people.
+                    name = profile.GetName() ?? "";
+
                     cheats = profile.m_usedCheats;
                     cheatStat = profile.m_playerStats.m_stats[PlayerStatType.Cheats];
                     knownWorlds = profile.m_knownWorlds.Count;
@@ -93,6 +102,11 @@ namespace Dyrr
 
             pkg.Write(true);
             pkg.Write(Format);
+
+            // First after the version, deliberately. Everything below can throw on a read and
+            // leave the report unreadable, and a report that failed halfway is exactly the one
+            // worth naming - so the name is the field that survives.
+            pkg.Write(name ?? "");
 
             pkg.Write(cheats);
             pkg.Write(cheatStat);
