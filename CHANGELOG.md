@@ -3,6 +3,17 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.2.0] - 2026-08-26
+
+### Added
+
+- **Idle kick, on dedicated servers.** A player who is genuinely still - no movement,
+  no camera - for 20 minutes (configurable) is kicked, after a one-chat-line warning
+  two minutes ahead. An AFK body holds a slot, keeps its zones simulated and blocks
+  the night from being skipped; the door works in both directions. The kicked player
+  is told why on their disconnect screen through the same channel a join refusal
+  uses, and the log line is worded for Crier to post the departure to Discord.
+
 ## [1.1.1] - 2026-08-23
 
 **A refusal says who was turned away.** The line was "Refused a connection: has played on 1

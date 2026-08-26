@@ -18,6 +18,9 @@ namespace Dyrr
         internal static ConfigEntry<bool> RefuseCheatCommands;
         internal static ConfigEntry<bool> RefuseTampered;
         internal static ConfigEntry<bool> RefuseMods;
+        internal static ConfigEntry<bool> KickIdle;
+        internal static ConfigEntry<int> IdleMinutes;
+        internal static ConfigEntry<int> IdleWarnMinutes;
         internal static ConfigEntry<string> ModPolicy;
         internal static ConfigEntry<string> AllowedMods;
         internal static ConfigEntry<string> DeniedMods;
@@ -109,6 +112,21 @@ namespace Dyrr
                 + "This is the only check here that does not depend on the client being honest, "
                 + "only on it being consistent. A false positive would need a character whose "
                 + "profile the game itself wrote inconsistently, which has not been seen.");
+
+            KickIdle = cfg.Bind("Idle", "KickIdle", true,
+                "Kick players who have been genuinely still - no movement, no camera - for "
+                + "IdleMinutes, after a warning. Dedicated servers only: an AFK body holds "
+                + "a slot, keeps its zones simulated and blocks the night from being "
+                + "skipped, and the door works in both directions.");
+
+            IdleMinutes = cfg.Bind("Idle", "IdleMinutes", 20,
+                "Minutes of complete stillness before the kick. Moving, fighting, turning "
+                + "the camera or sorting a chest all reset it; only a hands-off body does "
+                + "not.");
+
+            IdleWarnMinutes = cfg.Bind("Idle", "IdleWarnMinutes", 2,
+                "Minutes of warning before the kick, said once in the player's chat. 0 "
+                + "kicks without warning.");
 
             RefuseMods = cfg.Bind("Mods", "RefuseMods", true,
                 "Judge what the joining client has loaded, by BepInEx plugin GUID."

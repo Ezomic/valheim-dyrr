@@ -23,7 +23,9 @@ namespace Dyrr
     internal static class Doorman
     {
         private const string RpcFacts = "Dyrr_Facts";
-        private const string RpcRefused = "Dyrr_Refused";
+        // Internal, not private: the idle kick sends its goodbye through the same
+        // channel, and the client handler is already registered on every connection.
+        internal const string RpcRefused = "Dyrr_Refused";
 
         /// <summary>What each connection told us, keyed by ZRpc - the only identity that
         /// exists this early, since ZNetPeer is not set up until PeerInfo.</summary>

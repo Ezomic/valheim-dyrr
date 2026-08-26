@@ -38,7 +38,7 @@ namespace Dyrr
     {
         public const string PluginGuid = "ezomic.valheim.dyrr";
         public const string PluginName = "Dyrr";
-        public const string PluginVersion = "1.1.1";
+        public const string PluginVersion = "1.2.0";
         public const string PluginAuthor = "Robbin Thijssen";
 
         /// <summary>Core's plugin GUID. Optional - see TryRegisterWithCore.</summary>
@@ -111,6 +111,10 @@ namespace Dyrr
         /// </summary>
         private void Update()
         {
+            // Before the character-protection early-outs: the idle watch is a server
+            // duty and a dedicated server never has a local player.
+            Idle.Tick();
+
             if (!DyrrConfig.ProtectCharacter.Value) return;
             if (ZNet.instance == null || Game.instance == null) return;
 
