@@ -16,7 +16,7 @@ namespace Dyrr
     ///
     /// **What counts as moving.** Position OR facing, read off the character's ZDO on the
     /// server. Facing matters because a player standing at a chest sorting inventory does
-    /// not translate, but nobody plays this game for twenty minutes without once moving
+    /// not translate, but nobody plays this game for ten minutes without once moving
     /// the camera - and the camera is the character's yaw. The thresholds are small and
     /// the sweep is coarse (every five seconds), so this costs nothing measurable.
     ///
