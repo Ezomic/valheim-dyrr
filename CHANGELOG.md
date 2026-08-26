@@ -8,7 +8,7 @@ and the mod uses [semantic versioning](https://semver.org).
 ### Added
 
 - **Idle kick, on dedicated servers.** A player who is genuinely still - no movement,
-  no camera - for 10 minutes (configurable) is kicked, after a one-chat-line warning
+  no camera - for 5 minutes (configurable) is kicked, after a one-chat-line warning
   two minutes ahead. An AFK body holds a slot, keeps its zones simulated and blocks
   the night from being skipped; the door works in both directions. The kicked player
   is told why on their disconnect screen through the same channel a join refusal

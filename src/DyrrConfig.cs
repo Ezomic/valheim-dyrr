@@ -119,7 +119,7 @@ namespace Dyrr
                 + "a slot, keeps its zones simulated and blocks the night from being "
                 + "skipped, and the door works in both directions.");
 
-            IdleMinutes = cfg.Bind("Idle", "IdleMinutes", 10,
+            IdleMinutes = cfg.Bind("Idle", "IdleMinutes", 5,
                 "Minutes of complete stillness before the kick. Moving, fighting, turning "
                 + "the camera or sorting a chest all reset it; only a hands-off body does "
                 + "not.");
