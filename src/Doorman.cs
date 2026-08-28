@@ -282,10 +282,23 @@ namespace Dyrr
                         " - its travel record has been altered");
             }
 
-            if (DyrrConfig.RefuseMods.Value)
+            // The only rule at this door with a tier of its own. Enforce is one switch over
+            // everything below, so trialling the mod list by turning Enforce off also stopped
+            // refusing cheats and altered records for however long the trial ran - and nothing
+            // said so. Notice keeps the rest of the door shut while this one only watches.
+            var tier = Mods.Tier();
+            if (tier != Mods.Off)
             {
                 var mods = Mods.Judge(report.Plugins);
-                if (mods != null) Also(reasons, mods);
+
+                if (mods != null)
+                {
+                    if (tier == Mods.Refuse) Also(reasons, mods);
+                    else
+                        DyrrPlugin.Log.LogWarning(
+                            "Mods notice: a client " + mods
+                            + ". Admitted anyway - RefuseMods is Notice, not Refuse.");
+                }
             }
 
             return reasons.Length == 0 ? null : reasons.ToString();
@@ -306,16 +319,16 @@ namespace Dyrr
         {
             if (report.Plugins == null || report.Plugins.Count == 0) return;
 
-            var own = Mods.Own();
-            var extra = new List<string>();
-
-            foreach (var guid in report.Plugins)
-                if (guid != null && !own.Contains(guid.Trim().ToLowerInvariant())) extra.Add(guid);
-
+            // Permitted, not merely "what this server runs". Subtracting only the server's own
+            // plugins meant a mod the host had already allowed was named on every single
+            // connection forever - so the line never went quiet, and a log that always says
+            // something is a log nobody reads. Under Deny nothing is permitted in that sense
+            // and the full list is the point, which Mods.Unexpected handles.
+            var extra = Mods.Unexpected(report.Plugins);
             if (extra.Count == 0) return;
 
             DyrrPlugin.Log.LogInfo("A client brought " + extra.Count +
-                " plugin(s) this server does not run: " + string.Join(", ", extra.ToArray()));
+                " plugin(s) this server does not run or allow: " + string.Join(", ", extra.ToArray()));
         }
 
         private static void Also(StringBuilder reasons, string reason)

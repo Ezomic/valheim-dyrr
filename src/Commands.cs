@@ -146,7 +146,8 @@ namespace Dyrr
                 .Append('\n');
 
             text.Append("Mods: ");
-            if (!DyrrConfig.RefuseMods.Value)
+            var tier = Mods.Tier();
+            if (tier == Mods.Off)
             {
                 text.Append("not checked\n");
             }
@@ -155,8 +156,11 @@ namespace Dyrr
                 var deny = DyrrConfig.ModPolicy.Value.Trim()
                     .Equals(Mods.Deny, System.StringComparison.OrdinalIgnoreCase);
 
-                text.Append(deny ? "Deny" : "Allow").Append(" - ").Append(Mods.Own().Count)
-                    .Append(" run here, plus ").Append(deny ? "DeniedMods" : "AllowedMods")
+                // The tier is named even when it is Refuse, because "Allow - 12 run here" read
+                // as enforcing whatever Enforce and RefuseMods actually said.
+                text.Append(deny ? "Deny" : "Allow").Append(" (").Append(tier).Append(") - ")
+                    .Append(deny ? Mods.Own().Count : Mods.Permitted().Count)
+                    .Append(deny ? " run here, plus DeniedMods" : " permitted here")
                     .Append("\n");
             }
 

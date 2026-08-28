@@ -17,7 +17,13 @@ namespace Dyrr
         internal static ConfigEntry<bool> RefuseCheats;
         internal static ConfigEntry<bool> RefuseCheatCommands;
         internal static ConfigEntry<bool> RefuseTampered;
-        internal static ConfigEntry<bool> RefuseMods;
+        // A string rather than a bool, and that is a change from 1.2.0 rather than a preference.
+        // The only way to watch the mod rule without acting on it used to be Enforce = false,
+        // which is one gate over the whole verdict - so "let us see who this would turn away
+        // before we switch it on" also stopped refusing cheats and altered records for as long
+        // as it ran. Nothing said so. Off/Notice/Refuse gives the mod rule its own tier, and
+        // the legacy true and false still parse and still mean what they meant.
+        internal static ConfigEntry<string> RefuseMods;
         internal static ConfigEntry<bool> KickIdle;
         internal static ConfigEntry<int> IdleMinutes;
         internal static ConfigEntry<int> IdleWarnMinutes;
@@ -128,8 +134,17 @@ namespace Dyrr
                 "Minutes of warning before the kick, said once in the player's chat. 0 "
                 + "kicks without warning.");
 
-            RefuseMods = cfg.Bind("Mods", "RefuseMods", true,
+            RefuseMods = cfg.Bind("Mods", "RefuseMods", Mods.Refuse,
                 "Judge what the joining client has loaded, by BepInEx plugin GUID."
+                + "\n"
+                + "Off - do not look. Notice - look, write what was found to the log, and let "
+                + "everybody in anyway. Refuse - turn them away, which still needs Enforce on. "
+                + "The old true and false still work and mean Refuse and Off."
+                + "\n"
+                + "Notice exists because turning Enforce off is not a way to trial this rule: "
+                + "Enforce is one switch over every rule at the door, so trialling the mod list "
+                + "that way also stops refusing cheats and altered records for as long as the "
+                + "trial runs. Use Notice for a week, read the log, then set Refuse."
                 + "\n"
                 + "This is the check that actually reaches cheating on a dedicated server. "
                 + "Console.IsCheatsEnabled returns ZNet.instance.IsServer(), so a client's own "
@@ -162,7 +177,10 @@ namespace Dyrr
                 + "including you. This is for the client-only ones: a map mod, an equipment "
                 + "bar, and whatever you personally develop with."
                 + "\n"
-                + "Only read when ModPolicy is Allow.");
+                + "Only read when ModPolicy is Allow, and added to whatever is in "
+                + "BepInEx/config/dyrr-mods.txt. Prefer that file: this entry only takes effect "
+                + "when the server restarts, and letting one friend keep their map mod is not "
+                + "worth dropping everybody who is online.");
 
             DeniedMods = cfg.Bind("Mods", "DeniedMods", "",
                 "Plugin GUIDs no client may run, separated by commas. Case is ignored."

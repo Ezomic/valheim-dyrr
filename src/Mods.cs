@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using BepInEx;
 using BepInEx.Bootstrap;
 
 namespace Dyrr
@@ -34,6 +36,46 @@ namespace Dyrr
         internal const string Allow = "Allow";
         internal const string Deny = "Deny";
 
+        internal const string Off = "Off";
+        internal const string Notice = "Notice";
+        internal const string Refuse = "Refuse";
+
+        /// <summary>The file the allowlist actually lives in, beside the .cfg files.</summary>
+        private const string ListFile = "dyrr-mods.txt";
+
+        private static HashSet<string> _fromFile;
+        private static DateTime _fileStamp;
+        private static bool _fileMissingLogged;
+
+        /// <summary>
+        /// How hard to judge: Off, Notice or Refuse.
+        ///
+        /// The legacy true and false are still accepted because three profiles have them
+        /// written to disk and BepInEx's saved value beats any new default - so a bind that
+        /// stopped understanding them would silently turn the rule off on the live server,
+        /// which is the one machine where nobody would notice until it mattered.
+        /// </summary>
+        internal static string Tier()
+        {
+            var raw = (DyrrConfig.RefuseMods.Value ?? "").Trim();
+
+            if (raw.Equals("true", StringComparison.OrdinalIgnoreCase)) return Refuse;
+            if (raw.Equals("false", StringComparison.OrdinalIgnoreCase)) return Off;
+
+            if (raw.Equals(Off, StringComparison.OrdinalIgnoreCase)) return Off;
+            if (raw.Equals(Notice, StringComparison.OrdinalIgnoreCase)) return Notice;
+            if (raw.Equals(Refuse, StringComparison.OrdinalIgnoreCase)) return Refuse;
+
+            // An unreadable setting must not quietly open the door. Refuse is what the entry
+            // has always defaulted to, so a typo lands on the strict reading rather than the
+            // permissive one, and the log says which word was not understood.
+            DyrrPlugin.Log.LogWarning(
+                "RefuseMods is set to '" + raw + "', which is not Off, Notice or Refuse. "
+                + "Treating it as Refuse.");
+
+            return Refuse;
+        }
+
         /// <summary>
         /// Null when this client's plugins are acceptable, otherwise the reason they are not.
         /// </summary>
@@ -59,7 +101,11 @@ namespace Dyrr
             return hits.Count == 0 ? null : "is running " + Name(hits) + ", which this server does not permit";
         }
 
-        private static string NotAllowed(List<string> reported)
+        /// <summary>
+        /// Everything a client may be running without comment: what this server runs, plus both
+        /// places a host can name extras.
+        /// </summary>
+        internal static HashSet<string> Permitted()
         {
             var allowed = Listed(DyrrConfig.AllowedMods.Value);
 
@@ -69,19 +115,139 @@ namespace Dyrr
             // day a mod is added to it - including the admin.
             foreach (var guid in Own()) allowed.Add(guid);
 
+            foreach (var guid in FromFile()) allowed.Add(guid);
+
+            return allowed;
+        }
+
+        /// <summary>Everything this client brought that is not permitted. Empty when it is fine.</summary>
+        internal static List<string> Unexpected(List<string> reported)
+        {
             var extra = new List<string>();
+            if (reported == null) return extra;
+
+            // Under Deny nothing is "permitted" in this sense - the host is filling in a list of
+            // what to bar, so the useful report is everything the server does not itself run.
+            var permitted = DyrrConfig.ModPolicy.Value.Trim().Equals(Deny, StringComparison.OrdinalIgnoreCase)
+                ? Own()
+                : Permitted();
 
             foreach (var guid in reported)
             {
                 if (guid == null) continue;
-                if (allowed.Contains(guid.Trim().ToLowerInvariant())) continue;
+                if (permitted.Contains(guid.Trim().ToLowerInvariant())) continue;
 
                 extra.Add(guid);
             }
 
+            return extra;
+        }
+
+        private static string NotAllowed(List<string> reported)
+        {
+            var extra = Unexpected(reported);
+
             return extra.Count == 0
                 ? null
                 : "is running " + Name(extra) + ", which this server does not run and has not allowed";
+        }
+
+        /// <summary>
+        /// The allowlist held in a text file rather than a config entry, re-read whenever it
+        /// changes on disk.
+        ///
+        /// It exists because BepInEx never reloads a .cfg on its own - ConfigFile.Reload is
+        /// public and nothing calls it, and Core installs no watcher either - so permitting one
+        /// friend's map mod through AllowedMods costs a server restart and drops everybody who
+        /// is online. A house rule that expensive to relax stops being relaxed, and the door
+        /// ends up either wide open or turning away friends.
+        ///
+        /// Cached on the file's last-write time. Every connection would otherwise re-read it,
+        /// and a connection is not the moment to touch a disk more than once.
+        /// </summary>
+        private static HashSet<string> FromFile()
+        {
+            var path = Path.Combine(Paths.ConfigPath, ListFile);
+
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    // Written once, so the feature is discoverable. A host who never opens it is
+                    // exactly where they were; a host looking for where to add a mod finds it
+                    // next to the .cfg they are already editing.
+                    if (!_fileMissingLogged)
+                    {
+                        _fileMissingLogged = true;
+                        Seed(path);
+                    }
+
+                    _fromFile = new HashSet<string>();
+                    return _fromFile;
+                }
+
+                var stamp = File.GetLastWriteTimeUtc(path);
+                if (_fromFile != null && stamp == _fileStamp) return _fromFile;
+
+                _fileStamp = stamp;
+                _fromFile = new HashSet<string>();
+
+                foreach (var line in File.ReadAllLines(path))
+                {
+                    if (line == null) continue;
+
+                    // Everything after a # is a note. Commas too, because a host copying GUIDs
+                    // out of AllowedMods will paste them comma-separated and be right to.
+                    var text = line.Split('#')[0];
+
+                    foreach (var raw in text.Split(',', ';'))
+                    {
+                        var guid = raw.Trim().ToLowerInvariant();
+                        if (guid.Length > 0) _fromFile.Add(guid);
+                    }
+                }
+
+                DyrrPlugin.Log.LogInfo(
+                    ListFile + " read: " + _fromFile.Count + " extra plugin(s) permitted.");
+
+                return _fromFile;
+            }
+            catch (Exception e)
+            {
+                // A list that cannot be read must not become a list that permits everything, and
+                // must not become a refused connection either. It becomes an empty list and a
+                // warning, which is the same answer as a host who has not written one.
+                DyrrPlugin.Log.LogWarning("Could not read " + ListFile + ": " + e.Message);
+
+                _fromFile = new HashSet<string>();
+                return _fromFile;
+            }
+        }
+
+        private static void Seed(string path)
+        {
+            try
+            {
+                File.WriteAllText(path,
+                    "# Plugin GUIDs a client may run that this server does not.\r\n"
+                    + "# One per line. Everything after a # is ignored. Case does not matter.\r\n"
+                    + "#\r\n"
+                    + "# Read fresh whenever this file changes, so adding a line here takes\r\n"
+                    + "# effect on the next person to connect - no restart, nobody dropped.\r\n"
+                    + "# The AllowedMods setting in ezomic.valheim.dyrr.cfg still works and is\r\n"
+                    + "# added to this, but that one only takes effect when the server restarts.\r\n"
+                    + "#\r\n"
+                    + "# The plugins this server runs are always allowed and never need listing.\r\n"
+                    + "#\r\n"
+                    + "# Uncomment to let people keep the BepInEx config editor:\r\n"
+                    + "# com.bepis.bepinex.configurationmanager\r\n");
+
+                DyrrPlugin.Log.LogInfo("Wrote " + path + " - add client-only plugin GUIDs there.");
+            }
+            catch (Exception e)
+            {
+                DyrrPlugin.Log.LogWarning("Could not write " + ListFile + ": " + e.Message);
+            }
         }
 
         /// <summary>Every plugin loaded on this machine, lowercased for comparison.</summary>

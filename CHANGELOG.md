@@ -3,6 +3,42 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+
+- **`RefuseMods` is now `Off`, `Notice` or `Refuse` instead of true and false.** The old
+  values still parse and still mean Refuse and Off, so nothing on disk changes meaning.
+
+  There used to be one way to watch the mod rule without acting on it: turn `Enforce` off.
+  But `Enforce` is a single switch over the whole door, so trialling the mod list also
+  stopped refusing cheats, cheat commands and altered records for as long as the trial ran,
+  and nothing anywhere said so. `Notice` gives the mod rule its own tier and leaves the rest
+  of the door shut. A setting that is none of the three words is read as `Refuse` and logged,
+  because a typo must not be the thing that opens a server.
+
+- **The allowlist can live in `BepInEx/config/dyrr-mods.txt`,** one GUID per line, `#` for
+  notes. It is re-read whenever the file changes, so letting one friend keep their map mod
+  takes effect on the next connection instead of at the next restart.
+
+  `AllowedMods` still works and is added to it, but BepInEx never reloads a `.cfg` by itself -
+  `ConfigFile.Reload` is public and nothing calls it - so that entry costs a server restart
+  and everybody online. A house rule that expensive to relax stops being relaxed, and the door
+  ends up either wide open or turning away friends. The file is written with its own
+  explanation the first time Dyrr looks for it, so it is findable beside the `.cfg` a host is
+  already editing.
+
+### Fixed
+
+- **The "a client brought" log line went quiet.** It subtracted only the plugins the server
+  itself runs, so a mod already named in `AllowedMods` was reported on every single connection
+  for good. A log that always says something is a log nobody reads, and this one is how the
+  allowlist gets filled in. It now subtracts everything permitted - under `Deny` it still lists
+  everything the server does not run, which is the point there.
+
+- The `dyrr` console command said `Allow - 12 run here` whatever the rule was actually set to.
+  It now names the tier.
+
 ## [1.2.0] - 2026-08-26
 
 ### Added
