@@ -3,6 +3,18 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.3.0] - 2026-08-29
+
+### Changed
+
+- **`RefuseMods` is Off / Notice / Refuse instead of on and off.** Watching the rule
+  without acting on it used to mean turning `Enforce` off, and `Enforce` is one switch
+  over the whole verdict - so trialling the mod list also stopped refusing cheats,
+  cheat commands and altered builds. Notice logs what it would have done and lets the
+  player in.
+- The allowlist moves into its own file, so a long list is edited as a list.
+- `IdleMinutes` now defaults to 5, matching what the door has been set to in practice.
+
 ## [Unreleased]
 
 ### Changed
