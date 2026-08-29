@@ -73,6 +73,7 @@ namespace Dyrr
         private static void Handshake(ZNetPeer peer)
         {
             peer.m_rpc.Register<ZPackage>(RpcFacts, Receive);
+            peer.m_rpc.Register<ZPackage>(Inventories.Rpc, Inventories.Receive);
             peer.m_rpc.Register<string>(RpcRefused, OnRefused);
 
             peer.m_rpc.Invoke(RpcFacts, Facts.Gather());
@@ -385,6 +386,7 @@ namespace Dyrr
             if (peer == null || peer.m_rpc == null) return;
 
             Received.Remove(peer.m_rpc);
+            Inventories.Forget(peer.m_rpc);
             Verdicts.Remove(peer.m_rpc);
         }
     }

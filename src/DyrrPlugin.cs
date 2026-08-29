@@ -114,6 +114,7 @@ namespace Dyrr
             // Before the character-protection early-outs: the idle watch is a server
             // duty and a dedicated server never has a local player.
             Idle.Tick();
+            Inventories.Tick();
 
             if (!DyrrConfig.ProtectCharacter.Value) return;
             if (ZNet.instance == null || Game.instance == null) return;

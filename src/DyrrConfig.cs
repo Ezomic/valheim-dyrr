@@ -24,6 +24,10 @@ namespace Dyrr
         // as it ran. Nothing said so. Off/Notice/Refuse gives the mod rule its own tier, and
         // the legacy true and false still parse and still mean what they meant.
         internal static ConfigEntry<string> RefuseMods;
+        internal static ConfigEntry<bool> WatchInventories;
+        internal static ConfigEntry<float> InventoryInterval;
+        internal static ConfigEntry<int> InventoryDetail;
+        internal static ConfigEntry<bool> InventoryNamesIds;
         internal static ConfigEntry<bool> KickIdle;
         internal static ConfigEntry<int> IdleMinutes;
         internal static ConfigEntry<int> IdleWarnMinutes;
@@ -118,6 +122,33 @@ namespace Dyrr
                 + "This is the only check here that does not depend on the client being honest, "
                 + "only on it being consistent. A false positive would need a character whose "
                 + "profile the game itself wrote inconsistently, which has not been seen.");
+
+            WatchInventories = cfg.Bind("Inventory", "WatchInventories", true,
+                "Say so when a character comes back carrying something it did not leave "
+                + "with. The client reports a tally of its own inventory every "
+                + "InventoryInterval seconds; the server keeps the last one and compares "
+                + "the first report of the next session against it, so what is reported is "
+                + "a change made WHILE AWAY rather than ordinary play. "
+                + "Self-reported, and honest about it: a player's inventory is never sent "
+                + "to a server by the game - it lives in their own .fch - so a client "
+                + "built to lie can lie. This catches the ordinary case, which is somebody "
+                + "closing the game, editing the file and coming back richer. "
+                + "A crash can also trip it: the last snapshot may be a minute stale, and "
+                + "the game may itself roll a character back. The line says what moved so "
+                + "forty iron can be told from one arrow.");
+
+            InventoryInterval = cfg.Bind("Inventory", "InventoryInterval", 60f,
+                "Seconds between a client's inventory reports. Lower means a crash loses "
+                + "less and so raises fewer false alarms; it is a small package either way. "
+                + "Floored at 5.");
+
+            InventoryDetail = cfg.Bind("Inventory", "InventoryDetail", 6,
+                "How many changed items to name before the rest are counted. A line naming "
+                + "sixty items is a line nobody reads.");
+
+            InventoryNamesIds = cfg.Bind("Inventory", "InventoryNamesIds", false,
+                "Put the character's player id beside the name. Off by default because the "
+                + "line goes to Discord and a name is enough to ask somebody about it.");
 
             KickIdle = cfg.Bind("Idle", "KickIdle", true,
                 "Kick players who have been genuinely still - no movement, no camera - for "
