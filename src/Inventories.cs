@@ -34,6 +34,18 @@ namespace Dyrr
     /// roll a character back to its own last local save. Both show up here as a change. The
     /// wording says "changed while away" rather than accusing anybody, and the line names what
     /// moved so a human can tell forty iron from one arrow.
+    ///
+    /// **This must only ever report. It must never refuse, kick or correct anybody**, and
+    /// that is a decision rather than an omission. The crash above is indistinguishable from
+    /// tampering at the moment the report arrives - the same evidence, the same shape - so
+    /// anything automatic here would eventually throw an honest player off their own server
+    /// for losing their connection, which is a far worse failure than missing a cheat. The
+    /// judgement belongs to a person reading the line, who can ask.
+    ///
+    /// Concretely: nothing in this file may reach Doorman's verdict, call InternalKick, or
+    /// touch RpcRefused. Its only effects are a log line and a text file, and the two
+    /// references Doorman holds are wiring - registering this RPC and dropping the session
+    /// on disconnect - neither of which is on the path that decides admission.
     /// </summary>
     internal static class Inventories
     {
