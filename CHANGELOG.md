@@ -3,6 +3,24 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.4.0] - 2026-09-09
+
+Rebuilt for Valheim 1.0. This version does not run on pre-1.0 Valheim, and the previous
+one does not run on 1.0.
+
+### Fixed
+
+- **Reads the character's record again on Valheim 1.0.** The achievements system turned
+  `PlayerProfile`'s single stat record into an array of ten and moved the known-worlds and
+  known-commands lists inside it. The indices are not interchangeable - one is every increment,
+  one counts only what was eligible for an achievement, the rest are per difficulty - and this
+  mod wants the lifetime totals, which is the question it has always asked.
+- **The cheat counter is found by name rather than by the number the compiler baked in.** That
+  enum nearly doubled in 1.0. Had the entry moved, this would have read some other counter -
+  and since a mismatch between the cheat flag and its counter is treated as an altered record,
+  a counter that is really a death count would not have degraded the door, it would have shut
+  it on everyone.
+
 ## [1.3.0] - 2026-08-29
 
 ### Changed
