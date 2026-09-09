@@ -72,6 +72,7 @@ namespace Dyrr
             var knownWorlds = 0;
             var name = "";
 
+            // See CheatStat below for why that is a method rather than one dictionary lookup.
             try
             {
                 var profile = Game.instance != null ? Game.instance.GetPlayerProfile() : null;
@@ -83,7 +84,7 @@ namespace Dyrr
                     name = profile.GetName() ?? "";
 
                     cheats = profile.m_usedCheats;
-                    cheatStat = profile.m_playerStats.m_stats[PlayerStatType.Cheats];
+                    cheatStat = CheatStat(profile);
                     knownWorlds = profile.m_knownWorlds.Count;
 
                     foreach (var command in profile.m_knownCommands) commands.Add(command.Key);
@@ -133,6 +134,55 @@ namespace Dyrr
         /// deliberately GUIDs only: the server needs to recognise a mod, not to be handed a
         /// tour of somebody's machine.
         /// </summary>
+        /// <summary>
+        /// The Cheats counter, found by NAME rather than by the ordinal the compiler baked in.
+        ///
+        /// m_stats is a Dictionary&lt;PlayerStatType, float&gt; and C# compiles an enum member to
+        /// its constant, so `m_stats[PlayerStatType.Cheats]` is the literal 4 in the shipped
+        /// DLL. Insert a member above it - and an achievements system is exactly the thing that
+        /// reshuffles a player-stat enum - and this reads a different counter entirely, with
+        /// nothing to notice.
+        ///
+        /// That is worse here than the usual silent-wrong-number, because of what the value
+        /// feeds: Doorman treats "says it never cheated but carries a cheat count" as a tamper
+        /// signal and refuses the connection when RefuseTampered is on. A stat that is really
+        /// somebody's death count or crafting total is almost always above zero, so a
+        /// renumbering does not degrade the door, it slams it on everyone.
+        ///
+        /// Resolved by name, once, and cached. -1 when the member cannot be found at all, which
+        /// every consumer already treats as "no signal" because the test is `&gt; 0f` - so a
+        /// rename costs the corroboration and never invents a refusal. m_usedCheats, the actual
+        /// flag this corroborates, is a plain bool field and is unaffected.
+        /// </summary>
+        private static bool _cheatStatResolved;
+        private static PlayerStatType _cheatStatType;
+        private static bool _cheatStatKnown;
+
+        private static float CheatStat(PlayerProfile profile)
+        {
+            if (!_cheatStatResolved)
+            {
+                _cheatStatResolved = true;
+                try
+                {
+                    _cheatStatType = (PlayerStatType)Enum.Parse(typeof(PlayerStatType), "Cheats");
+                    _cheatStatKnown = true;
+                }
+                catch (Exception e)
+                {
+                    DyrrPlugin.Log.LogWarning("This game build has no PlayerStatType.Cheats, so "
+                        + "Dyrr cannot corroborate the cheat flag against its counter. The flag "
+                        + "itself still works; only the altered-record check loses this half. "
+                        + e.Message);
+                }
+            }
+
+            if (!_cheatStatKnown) return -1f;
+
+            float value;
+            return profile.m_playerStats.m_stats.TryGetValue(_cheatStatType, out value) ? value : 0f;
+        }
+
         private static List<string> Plugins()
         {
             var guids = new List<string>();
