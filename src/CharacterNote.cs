@@ -172,8 +172,11 @@ namespace Dyrr
                                 break;
                             }
 
-                if (names.Count < worlds.Count && profile != null && profile.m_knownWorlds != null)
-                    foreach (var known in profile.m_knownWorlds)
+                // m_knownWorlds moved inside PlayerStats in Valheim 1.0; Facts.Totals picks
+                // the lifetime bucket, which is what this was reading before.
+                var totals = Facts.Totals(profile);
+                if (names.Count < worlds.Count && totals != null && totals.m_knownWorlds != null)
+                    foreach (var known in totals.m_knownWorlds)
                     {
                         if (names.Count >= worlds.Count) break;
                         if (!names.Contains(known.Key)) names.Add(known.Key);
@@ -257,9 +260,10 @@ namespace Dyrr
             // presented as a fact.
             try
             {
-                if (profile != null && profile.m_knownWorlds != null && profile.m_knownWorlds.Count == 1
+                var totals = Facts.Totals(profile);
+                if (totals != null && totals.m_knownWorlds != null && totals.m_knownWorlds.Count == 1
                     && Facts.WorldsOf(profile).Count == 1)
-                    foreach (var known in profile.m_knownWorlds) return known.Key;
+                    foreach (var known in totals.m_knownWorlds) return known.Key;
             }
             catch (System.Exception e)
             {

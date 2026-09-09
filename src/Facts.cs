@@ -83,11 +83,19 @@ namespace Dyrr
                     // mod refuses characters, not people.
                     name = profile.GetName() ?? "";
 
+                    // m_usedCheats is still a field on the profile; everything else moved into
+                    // the stats array in 1.0. See Totals.
                     cheats = profile.m_usedCheats;
                     cheatStat = CheatStat(profile);
-                    knownWorlds = profile.m_knownWorlds.Count;
 
-                    foreach (var command in profile.m_knownCommands) commands.Add(command.Key);
+                    var totals = Totals(profile);
+                    if (totals != null)
+                    {
+                        if (totals.m_knownWorlds != null) knownWorlds = totals.m_knownWorlds.Count;
+
+                        if (totals.m_knownCommands != null)
+                            foreach (var command in totals.m_knownCommands) commands.Add(command.Key);
+                    }
 
                     uids = WorldsOf(profile);
                 }
@@ -127,13 +135,42 @@ namespace Dyrr
         }
 
         /// <summary>
-        /// Every BepInEx plugin loaded in this process, by GUID.
+        /// The character's lifetime record, which Valheim 1.0 moved.
         ///
-        /// Chainloader is what BepInEx itself judges by, so this is the same list the game's
-        /// own logs show at startup and there is nothing clever about reading it. It is
-        /// deliberately GUIDs only: the server needs to recognise a mod, not to be handed a
-        /// tour of somebody's machine.
+        /// PlayerProfile used to hold one PlayerStats, with m_knownWorlds and m_knownCommands as
+        /// fields beside it. 1.0 made it an array of ten and moved both dictionaries inside, as
+        /// part of the achievements system. The indices are not interchangeable:
+        ///
+        ///   [0]  every increment, unconditionally - IncrementStat writes here first
+        ///   [1]  only when Achievements.CanGetAchievements(cheated) is true
+        ///   [2..] one per achievement difficulty, via GetCurrentAchievementDifficultyIndex()
+        ///
+        /// [0] is the one this mod wants and the only one that preserves what it used to read.
+        /// Dyrr asks "has this character ever", and the totals bucket is that question - the
+        /// others answer "did it count toward an achievement", which is a different one.
+        ///
+        /// Returns null rather than throwing on a shape it does not recognise, and every caller
+        /// treats null as "unreadable" the way the surrounding gather already does.
         /// </summary>
+        internal static PlayerProfile.PlayerStats Totals(PlayerProfile profile)
+        {
+            try
+            {
+                if (profile == null) return null;
+
+                var stats = profile.m_playerStats;
+                if (stats == null || stats.Length == 0) return null;
+
+                return stats[0];
+            }
+            catch (Exception e)
+            {
+                DyrrPlugin.Log.LogWarning("Could not reach this character's stat record: "
+                    + e.Message);
+                return null;
+            }
+        }
+
         /// <summary>
         /// The Cheats counter, found by NAME rather than by the ordinal the compiler baked in.
         ///
@@ -179,10 +216,21 @@ namespace Dyrr
 
             if (!_cheatStatKnown) return -1f;
 
+            var totals = Totals(profile);
+            if (totals == null || totals.m_stats == null) return -1f;
+
             float value;
-            return profile.m_playerStats.m_stats.TryGetValue(_cheatStatType, out value) ? value : 0f;
+            return totals.m_stats.TryGetValue(_cheatStatType, out value) ? value : 0f;
         }
 
+        /// <summary>
+        /// Every BepInEx plugin loaded in this process, by GUID.
+        ///
+        /// Chainloader is what BepInEx itself judges by, so this is the same list the game's
+        /// own logs show at startup and there is nothing clever about reading it. It is
+        /// deliberately GUIDs only: the server needs to recognise a mod, not to be handed a
+        /// tour of somebody's machine.
+        /// </summary>
         private static List<string> Plugins()
         {
             var guids = new List<string>();
