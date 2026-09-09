@@ -121,7 +121,14 @@ namespace Dyrr
                 + "\n"
                 + "This is the only check here that does not depend on the client being honest, "
                 + "only on it being consistent. A false positive would need a character whose "
-                + "profile the game itself wrote inconsistently, which has not been seen.");
+                + "profile the game itself wrote inconsistently, which has not been seen."
+                + "\n"
+                + "The world half only runs when the client could actually read its own list "
+                + "of worlds. A game update that moves or renames that field leaves the list "
+                + "empty rather than wrong, which used to read as every character having wiped "
+                + "it - so the whole server was refused, and told so. When that happens now, "
+                + "the server logs that it is judging without the travel rules and lets people "
+                + "in.");
 
             WatchInventories = cfg.Bind("Inventory", "WatchInventories", true,
                 "Say so when a character comes back carrying something it did not leave "

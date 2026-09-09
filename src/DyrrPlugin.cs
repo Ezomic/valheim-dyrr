@@ -59,6 +59,29 @@ namespace Dyrr
 
         private Harmony _harmony;
 
+        /// <summary>
+        /// Whether Awake ran all the way to its last statement.
+        ///
+        /// Unity keeps calling Update on a component whose Awake threw. Nothing in Awake was
+        /// wrapped, so a config bind that failed, a Core registration that failed, or one
+        /// patch that would not apply left this plugin with an unpatched door and a live
+        /// Update - and Update runs the idle kicker. A server in that state throws players out
+        /// for standing still while judging nobody at the door, which is every cost of this mod
+        /// and none of its point, and the only sign of it is one exception in a log.
+        ///
+        /// Set as the LAST statement of Awake so it cannot be true for a half-built plugin, and
+        /// read as the first line of Update.
+        /// </summary>
+        private static bool _awakeCompleted;
+
+        /// <summary>
+        /// Whether the door itself patched. The idle kick waits on this rather than on
+        /// _awakeCompleted alone, because Doorman can fail on its own while the rest of Awake
+        /// finishes - and kicking for idleness on a server that admits everybody unjudged is
+        /// the same failure as above, arrived at a different way.
+        /// </summary>
+        private static bool _doorPatched;
+
         private void Awake()
         {
             Log = Logger;
@@ -70,17 +93,74 @@ namespace Dyrr
             AdoptOldConfig();
             DyrrConfig.Bind(Config);
 
-            TryRegisterWithCore();
+            // Caught for the same reason the dependency is soft: the door is supposed to work
+            // without Core, so an exception coming out of Core's API - a signature that moved,
+            // a version of Core that answers differently - must cost the version gate and the
+            // refusal screen, and not the door. Unwrapped it aborted Awake before a single
+            // patch was applied, which is the loudest possible way to give up the thing the
+            // whole plugin is for over an optional extra.
+            try
+            {
+                TryRegisterWithCore();
+            }
+            catch (Exception e)
+            {
+                CorePresent = false;
+                Log.LogError("Dyrr could not register with Core, so it runs standalone this "
+                    + "session: no version gate, and refused players see the reason only in "
+                    + "their own log. The door itself is unaffected. " + e);
+            }
 
             _harmony = new Harmony(PluginGuid);
-            _harmony.PatchAll(typeof(Doorman));
-            _harmony.PatchAll(typeof(MenuGuard));
-            _harmony.PatchAll(typeof(CharacterNote));
-            _harmony.PatchAll(typeof(Warden));
-            _harmony.PatchAll(typeof(Commands));
 
+            // One try/catch per class, not one around the five. PatchAll throws on the first
+            // method it cannot patch, so a single vanilla signature that moved in a game update
+            // used to abort Awake there and leave every class after it unpatched - and the
+            // order below is arbitrary, so which half of the mod survived a game update was
+            // decided by nothing. Caught per class, a signature change costs exactly the
+            // feature it belongs to and says which one that was.
+            _doorPatched = Patch(typeof(Doorman));
+            Patch(typeof(MenuGuard));
+            Patch(typeof(CharacterNote));
+            Patch(typeof(Warden));
+            Patch(typeof(Commands));
+
+            // Said plainly and at error level, because this is the state where the mod is
+            // installed, logs a cheerful ready line and judges nobody. An admin reading the log
+            // has to be able to tell that apart from a quiet day at the door.
+            if (!_doorPatched)
+                Log.LogError("Dyrr's door is NOT applied - the Doorman patches did not take, so "
+                    + "no connection will be judged and nobody will be kicked for idling "
+                    + "either. The line above names the method that would not patch.");
 
             Log.LogInfo(PluginName + " " + PluginVersion + " by " + PluginAuthor + " - ready.");
+
+            // The last statement in Awake, and it has to stay the last one. Update refuses to
+            // do anything until this is true; see the field.
+            _awakeCompleted = true;
+        }
+
+        /// <summary>
+        /// Patch one class, and treat a failure as the loss of that class rather than of the
+        /// plugin. Returns whether it took, which only the door is asked about.
+        /// </summary>
+        private bool Patch(Type type)
+        {
+            try
+            {
+                _harmony.PatchAll(type);
+                return true;
+            }
+            catch (Exception e)
+            {
+                // The whole exception, not e.Message. A Harmony patch failure names the target
+                // method inside the inner exception, and that name is the entire diagnosis when
+                // a game update moved something - it is the difference between "Dyrr is broken"
+                // and "ZNet.RPC_PeerInfo changed shape".
+                Log.LogError("Dyrr could not patch " + type.Name + ", so that part of the mod "
+                    + "is not running at all. " + e);
+                return false;
+            }
         }
 
         /// <summary>
@@ -111,9 +191,20 @@ namespace Dyrr
         /// </summary>
         private void Update()
         {
+            // Nothing at all until Awake finished. Unity calls Update on a component whose
+            // Awake threw, and everything below assumes an Awake that ran - the config entries
+            // it reads are bound there, and the door it belongs to is patched there.
+            if (!_awakeCompleted) return;
+
             // Before the character-protection early-outs: the idle watch is a server
             // duty and a dedicated server never has a local player.
-            Idle.Tick();
+            //
+            // Gated on the door having patched, because the idle kick is the door's other half
+            // and must never be the only half. A server whose Doorman patches failed admits
+            // every character unjudged; kicking people off it for standing still is all of this
+            // mod's teeth and none of its policy.
+            if (_doorPatched) Idle.Tick();
+
             Inventories.Tick();
 
             if (!DyrrConfig.ProtectCharacter.Value) return;

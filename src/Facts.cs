@@ -43,12 +43,33 @@ namespace Dyrr
         /// a garbled read - Core's version gate should have refused the connection long before
         /// this could happen, and this is what says so if it did not.
         /// </summary>
+        // 4 as of 2026-09-10: the travel record now says whether it could be READ, which is a
+        // different question from whether it is empty. Without that the server could not tell
+        // "this character has been nowhere" from "this build cannot see where it has been", and
+        // read the second as the first - so an unreadable m_worldData made KnownWorlds >
+        // Worlds.Count true for every player alive, and RefuseTampered refused all of them
+        // while publishing an accusation that their travel record had been altered. See
+        // WorldsOf below for the paths that produced the empty list, and Doorman's Verdict for
+        // the comparison that now waits on this flag.
+        //
         // 3 as of 2026-08-23: the character's own name rides along, so a refusal can say who
         // was turned away instead of only why. A server log line nobody can act on is a log
         // line nobody reads, and this one is forwarded to Discord where "somebody" is useless.
-        internal const int Format = 3;
+        internal const int Format = 4;
 
         private static System.Reflection.FieldInfo _worldData;
+
+        /// <summary>
+        /// Whether the travel record has already explained itself in this process.
+        ///
+        /// The shape of PlayerProfile.m_worldData is a property of the game build, not of the
+        /// moment - so once it has failed to read it will fail identically on every connection,
+        /// and Gather runs once per connection. One fully detailed line naming the runtime type
+        /// is greppable and survives in the log; the same line a hundred times is what an admin
+        /// scrolls past. The server says separately, per refused check, that it is running
+        /// blind - see Doorman - so silence here never means the consequence went unreported.
+        /// </summary>
+        private static bool _worldsExplained;
 
         /// <summary>
         /// Everything this client is willing to say about itself.
@@ -66,6 +87,7 @@ namespace Dyrr
             var pkg = new ZPackage();
 
             var uids = new List<long>();
+            var worldsRead = false;
             var commands = new List<string>();
             var cheats = false;
             var cheatStat = 0f;
@@ -97,7 +119,10 @@ namespace Dyrr
                             foreach (var command in totals.m_knownCommands) commands.Add(command.Key);
                     }
 
-                    uids = WorldsOf(profile);
+                    // The flag matters as much as the list. An empty list is a claim about
+                    // this character; an unreadable one is a fact about this build, and the
+                    // server must not judge the character for it.
+                    uids = WorldsOf(profile, out worldsRead);
                 }
             }
             catch (Exception e)
@@ -124,6 +149,10 @@ namespace Dyrr
             pkg.Write(commands.Count);
             foreach (var command in commands) pkg.Write(command);
 
+            // Written immediately before the list it qualifies, because it is a header on that
+            // list rather than a fact about the character: false means "do not read anything
+            // into the count that follows", including the zero.
+            pkg.Write(worldsRead);
             pkg.Write(uids.Count);
             foreach (var uid in uids) pkg.Write(uid);
 
@@ -262,25 +291,128 @@ namespace Dyrr
         /// </summary>
         internal static List<long> WorldsOf(PlayerProfile profile)
         {
+            bool read;
+            return WorldsOf(profile, out read);
+        }
+
+        /// <summary>
+        /// The same list, plus the only thing that made the difference between a door and a
+        /// wall: whether the dictionary was actually read.
+        ///
+        /// Every failure below used to return an empty list and say nothing, and an empty list
+        /// is indistinguishable from a character that has genuinely been nowhere. The server
+        /// compares KnownWorlds against this count to catch a wiped travel record, so an
+        /// unreadable m_worldData did not degrade that check, it inverted it: every player who
+        /// had ever saved anywhere had KnownWorlds above zero, tripped the comparison, and was
+        /// refused with a public accusation that they had altered their own save. One field
+        /// rename in a game update was enough to do that to a whole server, and the log would
+        /// have carried no line saying why.
+        ///
+        /// So `read` is true only when the dictionary was found, was a dictionary, and every
+        /// entry in it converted. A partial read is reported as no read, because a list that is
+        /// short by two worlds trips the same comparison as a list that is short by all of them.
+        /// </summary>
+        internal static List<long> WorldsOf(PlayerProfile profile, out bool read)
+        {
+            read = false;
+
             var into = new List<long>();
             if (profile == null) return into;
 
+            // Bound lazily and never in a static initialiser: a throwing type initialiser
+            // poisons every Harmony patch the type carries, and this one is reached from a
+            // patched RPC on both ends of a connection.
             if (_worldData == null)
                 _worldData = AccessTools.Field(typeof(PlayerProfile), "m_worldData");
 
             if (_worldData == null)
             {
-                DyrrPlugin.Log.LogError(
-                    "PlayerProfile.m_worldData not found - this character's travel cannot be seen.");
+                Explain("PlayerProfile.m_worldData not found - this character's travel cannot "
+                    + "be seen, so Dyrr will not judge anyone's travel record on this build.");
                 return into;
             }
 
-            if (!(_worldData.GetValue(profile) is IDictionary map)) return into;
+            object value;
+            try
+            {
+                value = _worldData.GetValue(profile);
+            }
+            catch (Exception e)
+            {
+                Explain("PlayerProfile.m_worldData could not be read (" + e.Message
+                    + "), so Dyrr will not judge anyone's travel record on this build.");
+                return into;
+            }
 
-            foreach (DictionaryEntry entry in map)
-                if (entry.Key is long uid) into.Add(uid);
+            // Not `is IDictionary` in one line any more. The type that turned up is the single
+            // most useful thing in the log when this fires, because it says whether the field
+            // moved, changed container or went generic-only - and the old form threw it away.
+            var map = value as IDictionary;
+            if (map == null)
+            {
+                Explain("PlayerProfile.m_worldData is "
+                    + (value == null ? "null" : "a " + value.GetType().FullName)
+                    + " rather than a dictionary this build can enumerate, so Dyrr will not "
+                    + "judge anyone's travel record on this build.");
+                return into;
+            }
 
+            var entries = 0;
+            string oddKey = null;
+
+            // Caught here rather than left to Gather's outer catch, and that is the difference
+            // between losing one field and losing the connection: the outer catch marks the
+            // WHOLE report unreadable, and RefuseUnreported - on by default - then turns the
+            // player away for it. A travel record that cannot be enumerated must cost the
+            // travel rules and nothing else.
+            try
+            {
+                foreach (DictionaryEntry entry in map)
+                {
+                    entries++;
+
+                    // Plain type test, not a cast: a key type that changed must be named, not
+                    // thrown. DictionaryEntry.Key is a boxed object and nothing here derives
+                    // from UnityEngine.Object, so a null compare is honest.
+                    if (entry.Key is long uid) into.Add(uid);
+                    else if (oddKey == null)
+                        oddKey = entry.Key == null ? "null" : entry.Key.GetType().FullName;
+                }
+            }
+            catch (Exception e)
+            {
+                Explain("PlayerProfile.m_worldData is a " + map.GetType().FullName
+                    + " that could not be walked entry by entry (" + e.Message
+                    + "), so Dyrr will not judge anyone's travel record on this build.");
+                return into;
+            }
+
+            if (into.Count != entries)
+            {
+                Explain("PlayerProfile.m_worldData holds " + entries + " entr(ies) keyed by "
+                    + oddKey + " rather than long, so only " + into.Count + " of them could be "
+                    + "read. Dyrr will not judge anyone's travel record on this build.");
+                return into;
+            }
+
+            read = true;
             return into;
+        }
+
+        /// <summary>
+        /// Say once, loudly, that the travel record cannot be read - and say what was found
+        /// instead, which is the half that makes the line worth having.
+        ///
+        /// LogError rather than LogWarning: this is a check silently switching itself off, and
+        /// the whole reason this mod exists in this shape is that "applied cleanly and did
+        /// nothing" must never be quiet. See _worldsExplained for why it is said once.
+        /// </summary>
+        private static void Explain(string what)
+        {
+            if (_worldsExplained) return;
+            _worldsExplained = true;
+
+            DyrrPlugin.Log.LogError("Dyrr travel record unreadable: " + what);
         }
     }
 }

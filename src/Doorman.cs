@@ -64,6 +64,15 @@ namespace Dyrr
             internal float CheatStat;
             internal int KnownWorlds;
             internal List<string> Commands;
+
+            /// <summary>
+            /// Whether the client could read its own travel record at all, which is not the
+            /// same as Worlds being empty. False means the list below carries no information -
+            /// not even its zero - and nothing may be concluded from its length. See
+            /// Facts.WorldsOf, and Verdict for what waits on this.
+            /// </summary>
+            internal bool WorldsRead;
+
             internal List<long> Worlds;
             internal List<string> Plugins;
         }
@@ -118,6 +127,9 @@ namespace Dyrr
 
                     var commands = pkg.ReadInt();
                     for (var i = 0; i < commands; i++) report.Commands.Add(pkg.ReadString());
+
+                    // Read before the count it qualifies, in the order Facts writes it.
+                    report.WorldsRead = pkg.ReadBool();
 
                     var worlds = pkg.ReadInt();
                     for (var i = 0; i < worlds; i++) report.Worlds.Add(pkg.ReadLong());
@@ -239,6 +251,23 @@ namespace Dyrr
 
             var reasons = new StringBuilder();
 
+            // An unreadable travel record blinds BOTH travel rules, and in opposite directions.
+            // RefuseOtherWorlds sees an empty list, counts no other worlds and lets everybody
+            // in; RefuseTampered used to see the same empty list, compare it against a
+            // known-worlds count that had read perfectly well, and refuse everybody - while
+            // telling each of them their save had been altered. The second is what the guard
+            // further down is for. This line is here because the first deserves saying too: a
+            // rule that has quietly stopped applying is the exact failure this mod is written
+            // against, and the server admin is the only person who can act on it.
+            if (!report.WorldsRead
+                && (DyrrConfig.RefuseOtherWorlds.Value || DyrrConfig.RefuseTampered.Value))
+                DyrrPlugin.Log.LogWarning(
+                    (string.IsNullOrEmpty(report.Name) ? "A client" : report.Name)
+                    + " could not read its own travel record, so this connection is judged "
+                    + "without the travel rules - neither refused for having played elsewhere "
+                    + "nor for an altered travel record. That client's own log names what was "
+                    + "found in place of PlayerProfile.m_worldData.");
+
             if (DyrrConfig.RefuseOtherWorlds.Value)
             {
                 var here = net.GetWorldUID();
@@ -277,7 +306,19 @@ namespace Dyrr
                     Also(reasons, "says it has never cheated but carries a cheat count of " +
                         report.CheatStat + " - that record has been altered");
 
-                if (report.KnownWorlds > report.Worlds.Count)
+                // Only against a travel record the client actually read. The two sides of this
+                // comparison come from different places - KnownWorlds off PlayerStats, the
+                // count off m_worldData through reflection - and only the second can fail to
+                // be read, so a failure there does not produce a missing signal, it produces a
+                // false one that fires on every honest player at once.
+                //
+                // Rejected: requiring Worlds.Count > 0 instead. It stops the same blanket
+                // refusal, but it also exempts the one case this check exists for - a travel
+                // record wiped clean rather than edited down - by making an emptied list
+                // unjudgeable. The flag separates "read it, it is empty" from "could not read
+                // it", which is the distinction the check actually needs, and the count floor
+                // throws that distinction away to get the same protection.
+                if (report.WorldsRead && report.KnownWorlds > report.Worlds.Count)
                     Also(reasons, "has played in " + report.KnownWorlds + " world(s) by its own " +
                         "history but admits to " + report.Worlds.Count +
                         " - its travel record has been altered");
