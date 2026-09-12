@@ -1,432 +1,397 @@
 # Dyrr
 
-A door policy. Characters that have played on another world do not come in.
+Dyrr is a join policy for Valheim servers. A character that has played on other worlds, that
+has used cheats, or that arrives with mods the server does not permit can be refused when it
+connects. Nothing is refused until an admin turns `Enforce` on.
 
-*Dyrr* is Old Norse for the doorway itself. This mod was called **Threshold** until 2026-08-18;
-nothing about it changed but the name. If you ran it under the old name, your settings and your
-character bindings are carried over on the first run and you do not need to do anything.
+It also kicks idle players on dedicated servers, reports when a character comes back carrying
+something it did not leave with, and stops your own client from taking a character into a world
+it does not belong to.
 
-## Installing
+## Features
 
-Needs BepInEx. Core is optional, see below. Through a mod manager it is one install. By hand,
-put `Dyrr.dll` in `BepInEx/plugins/Dyrr/`.
+- Six checks at the join: the character has spawned in another world, the game has flagged it
+  for cheats, it has run a console command the game classes as a cheat, its own records
+  disagree with each other, the client is running mods the server does not permit, or it did
+  not answer at all. Each can be switched off on its own.
+- `Enforce` is off by default. Every connection is still judged and the verdict is written to
+  the log, so you can see who would be turned away before anyone actually is.
+- A refused player is told which rule they broke, on their own screen if they have Longhouse
+  Core, and in their own log either way.
+- Character protection on the client: a character is bound to the first world it plays in, and
+  the game refuses to start it anywhere else. This works whether or not the server runs Dyrr.
+- Idle kick on dedicated servers, with a chat warning first.
+- Inventory watch: a log line when a character's inventory changed while it was offline. This
+  only ever reports. It never refuses or kicks.
+- A `dyrr` console command that prints the standing verdict for everyone currently connected.
 
-Then start the game once and quit. That first run writes the config file, which does not exist
-before the mod has loaded, and that is the usual reason people think it is broken.
+## How the join check works
 
-**Nothing is refused until you turn `Enforce` on.** Out of the box the door only logs what it
-would have refused, on purpose. The half that does work immediately is the menu guard on the
-client, which stops you taking a character into a world it does not belong to.
+Both ends register an RPC as soon as the connection object exists, before either side sends
+PeerInfo. The client sends what it knows about its own character: the character name, the
+cheats flag and its counter, the name of every console command the character has ever run, the
+UIDs of every world it has spawned in, and the BepInEx plugin GUIDs loaded on that machine. The
+server does the arithmetic in a prefix on `ZNet.RPC_PeerInfo` and refuses before the player
+spawns, so a refused player never watches the world load first. All of it comes out of
+`PlayerProfile`, which lives on the client's disk, so all of it is self-reported. See
+[Known limits](#known-limits).
 
-## Why this is its own mod
+Which console commands count as cheats is decided on the server, from the server's own
+`Terminal` command table, so a cheat command added by some other mod on the server counts for
+free. A dedicated server has no guarantee of having built that table when the first player
+knocks, so there is a fallback list of the 73 vanilla commands registered with `isCheat: true`.
 
-It used to live inside [Rist](https://thunderstore.io/c/valheim/p/Ezomic/Rist/), and that was the wrong place for it.
+**The mod check is the one that reaches cheating on a dedicated server.**
+`Console.IsCheatsEnabled()` returns `ZNet.instance.IsServer()`, so a client's own `devcommands`
+does nothing on someone else's server. Anyone cheating there is running a mod that patched
+around that line, which makes "what is this client running" the more useful question.
 
-Rist awards character levels for skill gains, so it needs to know whether a character's skills
-were actually earned on this server. It answered that by **refusing the connection**, which
-put a levelling mod in charge of who is allowed to play. The failure mode is exactly what you
-would expect: a bug in an XP system locks people out of a server. And when it fired, the player
-got Valheim's generic kick screen with the reason written only to the server's log, which on
-somebody else's server they can never read. The first time it happened in practice, the person
-affected assumed a completely unrelated mod had blocked them.
+**The tamper check does not need the client to be honest, only consistent.** The game writes
+the same facts in more than one place: `m_usedCheats` is a bool, `PlayerStatType.Cheats` is a
+counter incremented on the next line, and `m_knownWorlds` records worlds by name at save time
+where `m_worldData` records them by UID at spawn. A flag that is clear beside a counter above
+zero, or more world names than world UIDs, is an edited save. Neither inequality can be
+produced by playing the game.
 
-So the two halves were separated by what each is actually for:
+## Character protection
 
-- **Rist** keeps the question it has standing to ask, *do I pay for these levels?*, and
-  answers it by withholding XP. Nobody is disconnected, nothing already earned is removed, and
-  the player is told once, on screen.
-- **Dyrr** owns the question of who comes through the door. That is a server policy, it
-  has nothing to do with levelling, and it is the whole of this mod.
+Refusing a character at the join arrives too late to help it. Loading a character into any world
+writes that world into `PlayerProfile.m_worldData` permanently, and nothing in the game ever
+removes the entry. So the client half refuses the trip instead.
 
-The split also makes each honest about its own limits, which the fused version could not be.
+Each character is bound to the first world it is seen in, recorded in
+`BepInEx/config/dyrr-home.txt`. After that:
 
-## Two halves, and the important one is the preventive half
+- Starting a **local world** with a character bound elsewhere is refused at
+  `FejdStartup.OnWorldStart`, with a popup naming both worlds and the file to edit.
+- **Joining a server** whose world is not the character's home is dropped inside
+  `RPC_PeerInfo`, before the character spawns and before the game writes anything. This works
+  whatever the server does, and whether or not the server runs Dyrr at all. That is
+  `ProtectOnServers`.
 
-**Refusing at the door is the lesser half**, because by the time it fires the harm is already
-done. Loading a character into any world writes that world into `PlayerProfile.m_worldData`
-permanently. Refusing the connection afterwards tells you about a mistake you can no longer
-undo.
+Neither asks for confirmation. The damage has no undo, so a confirm dialog would just be a
+button for doing the unfixable thing.
 
-So the other half runs on the client, and **it refuses to take a character into a world that is
-not its own** - a local world or somebody else's server, whether or not that server runs this
-mod. For a local world the commit point is `FejdStartup.OnWorldStart`, in the menu. For a
-server there is no equivalent in the menu, because a server's world identity is not known until
-after connecting; the check goes at the one moment on the join path where the world is known
-and nothing has been written yet, and leaves before the character spawns.
+The character select screen carries the answer under the character's name, in a clone of
+vanilla's own "Cloud save" label: `Belongs to <world>`, `Not bound to a world yet`,
+`Has played in <world> and <world>` for a character that already has more than one, or
+`Belongs to a world that is not on this PC` when the world is a server's. The line follows
+`ProtectCharacter` and disappears with it.
 
-It refuses rather than asking. A confirm dialog was tried and rejected: the damage is
-irreversible, so a prompt is just a button for doing the unfixable thing by clicking through
-it. A dead end forces a wrong answer to be diagnosed instead of waved past, so the popup
-carries everything needed to correct it: both ids and the file to edit.
+A character with exactly one world in its own save is bound on the spot even if Dyrr has never
+watched it play. A character with more than one is left unbound, since there is no single home
+left to defend, and those are exactly the characters an enforcing server turns away.
 
-Each character is bound to the first world it is accepted in, recorded in
-`BepInEx/config/dyrr-home.txt`. That file is protection, not enforcement; editing it only
-lets you damage your own character, which is why it is plain text you can open and fix. Nothing
-that turns *other people* away is ever read from the client.
+## Idle kick
 
-The server case is worth spelling out, because it is where the window is narrow. The client
-learns which world it is joining inside `ZNet.RPC_PeerInfo`, which reads the world name, seed
-and uid straight off the wire. The permanent record - the entry in
-`PlayerProfile.m_worldData` - is only ever written by `PlayerProfile.GetWorldData`, reached
-from the logout point, the map data and the spawn point, all of which need a player who has
-spawned. Between those two facts there is a window, and this is the whole of it. Leaving is
-what vanilla itself does when you are kicked: set the connection status, drop the peer. The
-logout that follows saves nothing, because `Game.SavePlayerProfile` does nothing at all
-without a local player and there is not one yet.
+On dedicated servers only. A player whose character has not moved 5cm or turned one degree for
+`IdleMinutes` is kicked, after a chat warning `IdleWarnMinutes` ahead. Position and facing are
+read off the character's ZDO every five seconds. Walking, fighting, turning the camera or
+sorting a chest all reset the clock.
 
-So the door and the guard now cover the same ground from both sides, which is exactly why they
-belong in one mod. This used to live in Rist, warning about a lockout Rist had no part in.
+The kick itself is vanilla's own `InternalKick`, the same path the console command takes, so the
+player gets the ordinary kicked screen with a reason attached. A locally hosted world is never
+watched.
 
-## What it checks
+## Inventory watch
 
-Six questions, asked of every connection: has this character spawned in a world other than this
-one, has the game flagged it for cheats, has it run a console command the game calls a cheat,
-do its own records disagree with each other, is the client running mods this server does not
-allow, and did it answer at all. Each can be turned off on its own; see
-[Settings](#settings) for the full list.
+A player's inventory never crosses the wire in vanilla: it lives in their own `.fch` on their
+own disk. So the client sends a tally of what it is carrying every `InventoryInterval` seconds,
+the server keeps the most recent one, and compares the first report of the **next** session
+against it. What that catches is a change made while the character was away, rather than
+ordinary play.
 
-`Enforce` is **off by default**, and deliberately. This is the one setting in the family that
-can lock people out of a server, including you. It should be something an admin turns on having
-read what it does, not something that happens because a mod got installed.
+The line names what moved, biggest movement first. Item names are the game's own localisation
+tokens, and anything above quality 1 carries its level:
 
-## Read this before turning Enforce on
+```
+Inventory changed while away: Balder, +40 $item_iron, +12 $item_silverore, +1 $item_sword_iron*4
+```
 
-**The game never removes entries from a character's world list.** One visit anywhere else is
-permanent for that character file. Restoring a backup taken before the trip is the only way
-back in. The cheat flag is the same, set by `devcommands`, never cleared.
+Two honest sources of false alarms: a client that crashes stops sending, so the stored snapshot
+can be up to one interval stale, and Valheim can itself roll a character back to its own last
+local save. Both look identical to tampering at the moment the report arrives, which is why
+this only ever writes a log line. Nothing here can refuse, kick or correct anybody.
 
-That severity is the point: it is what makes a skill level on this server mean something. But
-it has no undo, and it applies to your own character exactly as it does to everyone else's.
+## Installation
 
-## How it works
+Through a mod manager, install
+[Dyrr](https://thunderstore.io/c/valheim/p/Ezomic/Dyrr/) and it is done. By hand, put
+`Dyrr.dll` in `BepInEx/plugins/Dyrr/`.
 
-The shape is lifted from Core's version handshake, because the problem is identical. Both ends
-register an RPC the moment the connection object exists, in `ZNet.OnNewConnection`, which
-happens before either side sends `PeerInfo`. ZRpc delivers in order on one connection, so by
-the time `RPC_PeerInfo` runs the answer has arrived and there is something to judge. Anything
-later means deciding on data that has not turned up yet, and the symptom of getting that wrong
-is a door that admits the first connection and works ever after.
+- Requires [BepInEx 5.4.2350](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/).
+  BepInEx 5 API only, not compatible with BepInEx 6.
+- [Longhouse Core](https://thunderstore.io/c/valheim/p/Ezomic/Longhouse_Core/) is an optional
+  soft dependency. See [Multiplayer](#multiplayer).
+- Install it on the server **and** on every client. The facts being judged live on the client,
+  so a client without Dyrr answers nothing, and `RefuseUnreported` is on by default.
 
-Two deliberate differences from the version that lived in Rist:
+Start the game or the server once and quit. That first run writes
+`BepInEx/config/ezomic.valheim.dyrr.cfg`, which does not exist until the plugin has loaded.
+This is the usual reason people think the mod is broken.
 
-**It refuses before the player is admitted.** Rist's ran after spawn, on a routed RPC, so a
-refused player watched the world load and then got dropped, which reads far more like a crash
-than like a rule.
+Built against Valheim 1.0.7. Version 1.4.0 does not run on pre-1.0 Valheim, and 1.3.0 does not
+run on 1.0.
 
-**The client sends its raw world list, and the server does the arithmetic.** At handshake time
-the client does not reliably know which world it is joining; the UID arrives later. Rist asked
-the client to subtract the current world itself, which is part of why it had to run so late.
-Sending the list lets the server, which certainly knows its own UID, work it out, and lets
-the whole exchange finish before anyone is let in.
+## Before you turn Enforce on
 
-**The reason travels to the client.** Valheim's refusal screen carries no text of its own, so
-the message is sent over the wire before the disconnect and logged on the client's own machine.
-Being told which rule you broke is the difference between a door and a mystery.
+Read this part. `Enforce` is the one setting here that can lock people out of a server,
+including you.
 
-## Core is optional
+- **The game never removes a world from a character's record.** One visit anywhere else is
+  permanent for that character file. Restoring a backup taken before the trip is the only way
+  back in, and it does work: a character refused for having travelled came back from backup and
+  was admitted.
+- **The cheat flag is the same.** `devcommands` sets it and nothing clears it.
+- **Being an admin does not exempt you.** Dyrr does not consult `adminlist.txt` anywhere. Your
+  own character is judged by exactly the same rules as everybody else's.
+- **With `Enforce` on, a client without Dyrr is refused** by `RefuseUnreported`. If you are
+  running Core as well, its version check turns that client away first.
+- **Every server you run must enforce.** A lenient server is a hole a bound character walks
+  into, and the lenient one is what ruins it. Keep a separate character per server.
 
-Dyrr installs and runs on its own, which is useful if you want a door policy and none of the rest
-of this suite. Core is a **soft** dependency, and installing Dyrr no longer installs it.
+The order that works: leave `Enforce` off, let people connect, run `dyrr` and read the log, put
+the innocent plugins in `dyrr-mods.txt`, then turn `Enforce` on.
 
-**The door itself works standalone.** Doorman carries its own handshake and does its own
-refusing on the server side of `RPC_PeerInfo`; none of that is Core's.
+`ProtectCharacter` is on while `Enforce` is off. Refusing other people is a policy somebody
+should choose; refusing to let you ruin your own character is not.
 
-Two things are given up. The **version gate**, which matters more here than elsewhere: the
-facts being judged are reported *by the client*, so an old build of Dyrr answering an
-unfamiliar question is precisely the case the gate would have caught. And the **refusal
-screen**: Core is what carries the reason through to Valheim's kick dialog. Without it a
-refused player gets the reason in their own log and a generic screen, which is exactly the
-failure that splitting this out of Rist was meant to fix. It still logs; it just cannot draw.
+## Configuration
 
-Install Core on the clients to put the reason back on the screen.
+`BepInEx/config/ezomic.valheim.dyrr.cfg`. Every entry carries its own comment in the file.
 
-## On cheating, and what a door can actually do about it
+**Door** (server side)
 
-Start with the line that decides everything: **`Console.IsCheatsEnabled()` returns
-`ZNet.instance.IsServer()`.** On a dedicated server a client's own `devcommands` is inert - it
-flips a bool the gate then ignores. So nobody is cheating on somebody else's server with
-vanilla. Anybody cheating there is running a mod that patched around that line, which means the
-useful question is not *did this character use cheats* but **what is this client running**.
-That is what `RefuseMods` asks, and it is the check that actually reaches the problem.
-
-The character checks still matter, because a cheat mod leaves marks. `m_usedCheats` is a bool
-set in `Terminal.ConsoleCommand.RunAction`, and a mod that switches devcommands on will trip
-it. A mod that also clears it will not - but it has to clear the same fact in four places, and
-they are written at different moments by different code:
-
-| Record | Written | Independent because |
+| Setting | Default | Effect |
 | --- | --- | --- |
-| `m_usedCheats` | in `RunAction`, if the command is a cheat | the one everybody knows about |
-| `m_playerStats[Cheats]` | the very next line | a counter, not a bool |
-| `m_knownCommands` | a few lines down, **outside** the cheat branch | records the name of *every* command run |
-| `m_knownWorlds` | in `SavePlayerToDisk`, by world **name** | `m_worldData` records the same trips by **uid** |
+| `Enabled` | `true` | Off leaves the plugin loaded and judging nothing. Server side only |
+| `Enforce` | `false` | On refuses the connection. Off logs what would have been refused |
+| `RefuseOtherWorlds` | `true` | Refuse a character that has spawned in any world but this one |
+| `RefuseCheats` | `true` | Refuse a character the game has flagged for `devcommands` use |
+| `RefuseCheatCommands` | `true` | Refuse a character that has run a command the game marks as a cheat. The command is named in the log and in the refusal |
+| `RefuseTampered` | `true` | Refuse a character whose own records disagree with each other |
+| `RefuseUnreported` | `true` | Refuse a connection that answers nothing, or whose profile could not be read |
+| `RefusedMessage` | `This server refused this connection.` | Sent to the refused client. The specific reason is appended as a sentence starting "It", so keep this one general |
 
-So the flag being clear while the counter is above zero is not a suspicion, it is an edit. More
-world names than world uids means the travel record was scrubbed - and that inequality only
-runs one way, so the game itself cannot trip it. That is `RefuseTampered`, and it is the only
-check here that does not need the client to be honest, only consistent.
+**Protect** (client side)
 
-Which commands count as cheats is decided **on the server**, from the server's own command
-table, so a cheat command added by another mod counts for free and the client has no say in the
-rule it is judged by.
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `ProtectCharacter` | `true` | Refuse to start a local world with a character that belongs to a different one, and record which world each character belongs to |
+| `ProtectOnServers` | `true` | Extend that to servers: leave the connection before spawning if the server's world is not this character's home |
 
-### A cheat that never touches the console leaves no mark
+**Mods** (server side)
 
-Proven here rather than reasoned about. Devkit - one of my own mods - has a god mode switch
-that calls `player.SetGodMode` directly. It does not go through
-`Terminal.ConsoleCommand.RunAction`, so **none of the four records above are written**: no
-flag, no counter, no command name. A character that had just used it came to an enforcing
-server and the character checks found nothing, correctly, because there was nothing there.
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `RefuseMods` | `Refuse` | `Off`, `Notice` or `Refuse`. Notice logs what it would have done and lets everyone in. The legacy `true` and `false` still parse as Refuse and Off |
+| `ModPolicy` | `Allow` | `Allow`: only what this server runs, plus the allowlist. `Deny`: anything except `DeniedMods` |
+| `AllowedMods` | *empty* | Extra GUIDs a client may run, comma separated. Prefer `dyrr-mods.txt`, below |
+| `DeniedMods` | *empty* | GUIDs no client may run, comma separated. Only read under `Deny` |
 
-That is not a gap in those checks, it is their shape. They catch cheating that went through
-the console, which is the only kind vanilla can do and the kind a `devcommands`-enabling mod
-does. A mod that flips the state itself is invisible to every record the game keeps.
+`Notice` exists because `Enforce` is a single switch over every rule at once. Trialling the mod
+list by turning `Enforce` off also stops refusing cheats and altered records for as long as the
+trial runs. Use `Notice` for a week, read the log, then set `Refuse`.
 
-Which is the whole reason `RefuseMods` exists, and on that same connection it is what saw it:
+The plugins the server itself runs are always permitted and never need listing, so adding a mod
+to the server does not refuse everybody the next day. A value that is none of the three words is
+read as `Refuse` and logged, so a typo cannot be the thing that opens a server.
+
+**Inventory**
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `WatchInventories` | `true` | Report when a character comes back carrying something it did not leave with |
+| `InventoryInterval` | `60` | Seconds between a client's inventory reports. Floored at 5 |
+| `InventoryDetail` | `6` | How many changed items to name before the rest are counted |
+| `InventoryNamesIds` | `false` | Put the character's player id beside the name in the log line |
+
+**Idle** (dedicated servers)
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `KickIdle` | `true` | Kick players who have been completely still for `IdleMinutes` |
+| `IdleMinutes` | `5` | Minutes of stillness before the kick |
+| `IdleWarnMinutes` | `2` | Minutes of warning first, said once in the player's chat. `0` kicks without warning |
+
+BepInEx writes every entry to disk on the first run, and the saved value beats a new default in
+code. If a setting appears to do nothing after an update, check the `.cfg` before anything else.
+
+## Files Dyrr writes
+
+All three live in `BepInEx/config/`, as plain text.
+
+**`dyrr-home.txt`** (client). One line per character: `playerId|worldUid|character|world`. Only
+the two numbers are read; the names are there so you can recognise the line. Delete a line to
+unbind that character. The file is re-read whenever it changes, so you can edit it with the game
+running. Editing it can only damage your own character, which is why it is not defended.
+
+**`dyrr-mods.txt`** (server). The allowlist, one GUID per line, `#` for comments. Written with
+its own explanation the first time Dyrr looks for it. It is re-read whenever it changes, so
+letting one friend keep their map mod takes effect on the next connection rather than at the
+next restart. `AllowedMods` in the `.cfg` still works and is added to this, but BepInEx never
+reloads a `.cfg` on its own, so that entry costs a server restart and everybody online.
+
+**`dyrr-inventories.txt`** (server). The last inventory snapshot per character. Safe to delete;
+you lose the next comparison and nothing else.
+
+## Console commands
+
+The console needs Valheim's `-console` launch argument on a client. A dedicated server has one
+already. None of these are cheat commands and none are admin gated: the report is the server's
+own state to whoever is already at its console, and the bindings are the local machine's own
+file.
+
+| Command | Does |
+| --- | --- |
+| `dyrr` | What the join check is doing here |
+| `dyrr home` | Which world each character on this machine belongs to |
+| `dyrr forget <id>` | Unbind a character, so the next world it plays in becomes its new home |
+
+`dyrr forget` does not undo anywhere the character has already been. The game's record of that
+is permanent and no mod can clear it.
+
+On a server, `dyrr` prints something like:
 
 ```
-A client brought 1 plugin(s) this server does not run: ezomic.valheim.devkit
-```
-
-It was admitted only because that GUID is in `AllowedMods`. Ask what the client is running,
-not only what the character has done.
-
-### The limit, stated plainly
-
-`PlayerProfile` lives on the client, so **everything here is self-reported**, the mod list
-included. A purpose-built client can lie about all of it, and no amount of extra records
-changes that - it only raises what a liar has to keep straight.
-
-What this catches is the ordinary case: somebody who installed a cheat mod from Thunderstore
-and did not think about it, or brought a character that levelled somewhere else. That is a
-house rule with a lock on the door, not a security boundary. Core's version gate makes it
-meaningful by refusing clients without the plugin at all; a client that has it and has been
-modified is beyond what any of this can see.
-
-## Before it can refuse: the character-select screen
-
-The refusal popup is a dead end on purpose, and a dead end is a much better thing to arrive at
-knowingly. So the character-select screen carries one line under the name:
-
-> Belongs to world 'longhouse' (-4881...)
-
-or, for a character that has not played anywhere yet:
-
-> Not bound to a world yet. The first one it plays in becomes its home.
-
-It sits in `m_csSourceInfo`, vanilla's own notice label - the one that carries the legacy-save
-and cloud-saves-disabled warnings - so it looks like part of the screen because it is. Nothing
-there prevents anything; it is what stops the refusal at the next screen being a surprise.
-
-It follows `ProtectCharacter`. With the protection off, a binding is a leftover in a file
-rather than a fact about the character, and saying it would imply a rule that is not running.
-
-## Asking the door what it is doing
-
-`Enforce` off is not a disabled state. It is the state an admin is meant to sit in while
-deciding: every connection is still judged and what would have happened is still reported. The
-trouble was that it reported one line at a time into a log, at the moment each player
-connected, so the question actually being asked - *if I turn this on, who stops being able to
-play?* - could only be answered by reading back through a log for lines that scrolled past
-while nobody was watching.
-
-`dyrr` in the console answers it standing:
-
-```
-Dyrr 1.1.0
+Dyrr 1.4.0
 World: 'midgard' (-4881...)
 Enforce is OFF - failures are reported here and refused to nobody.
-Checks: other worlds on, cheats on, unreported on
+Checks: other worlds on, cheats on, cheat commands on, tampered on, unreported on
+Mods: Allow (Refuse) - 12 permitted here
 Refused so far this session: 0
 
   Ragnar  admitted
   Sigrun  would refuse: has played on 2 other world(s)
 ```
 
-On a server the same block goes to `BepInEx/LogOutput.log`, because a console scrolls and a log
-file does not. On a client it reports what that machine knows instead: whether a server has
-refused it this session, and why.
+The same block also goes to `BepInEx/LogOutput.log`, because a console scrolls and a log file
+does not. On a client it reports what that machine knows instead: whether a server has refused
+it this session, and why, plus the local bindings.
 
-Two more:
-
-- `dyrr home` - which world each character on this machine belongs to, by name as well as id.
-- `dyrr forget <id>` - unbind a character, so the next world it plays in becomes its new home.
-  This does not undo anywhere it has already been; the game's record of that is permanent and
-  no mod can clear it.
-
-Neither is a cheat command and neither is admin-gated, because neither reads or changes
-anything that was not already open to whoever can run it: the report is the server's own state
-to somebody already at its console, and the bindings are this machine's own text file.
-
-The console needs Valheim's `-console` launch argument on a client. A dedicated server has one
-already.
-
-## Turning the mod check on without locking out your own players
-
-`ModPolicy = Allow` refuses a client running anything the server does not, which is the point,
-and also the way to empty a server by accident. Both lists ship **empty** and `DeniedMods`
-could not honestly ship otherwise - a list of cheat mod GUIDs written in advance is out of date
-the week after and reads as complete when it is not.
-
-What you build them from is what actually turns up. **Every plugin a client brings that this
-server does not run is written to the log as it connects**, admitted or refused:
+Every plugin a joining client brings that the server does not run or allow is logged as it
+connects, admitted or refused. That line is what you build the allowlist from:
 
 ```
-A client brought 2 plugin(s) this server does not run: randyknapp.mods.equipmentandquickslots, ...
+A client brought 2 plugin(s) this server does not run or allow: randyknapp.mods.equipmentandquickslots, ...
 ```
 
-So the order that works is: leave `Enforce` off, let people connect, run `dyrr` and read the
-log, put the innocent ones in `AllowedMods`, and only then turn `Enforce` on. `dyrr` prints the
-standing verdict for everyone currently connected, which is the whole point of Enforce having
-an off position.
-
-One case worth naming because it will be yours: a server does not run the tools you develop
-with. If your own client carries something the server does not, it is refused by its own door
-like anybody else, and the fix is a line in `AllowedMods`.
-
-## Settings
-
-The file is `BepInEx/config/ezomic.valheim.dyrr.cfg`. Every entry carries a comment explaining
-itself, so the file is the reference; this is the map.
-
-| Setting | Default | What it does |
-| --- | --- | --- |
-| `Enabled` | on | Off leaves the plugin loaded and checking nothing. Server side only |
-| `Enforce` | **off** | On refuses the connection. Off only logs what would have been refused |
-| `RefuseOtherWorlds` | on | Refuse a character that has spawned in any world but this one |
-| `RefuseCheats` | on | Refuse a character the game has flagged for `devcommands` use |
-| `RefuseCheatCommands` | on | Refuse a character that has run a command the game marks as a cheat |
-| `RefuseTampered` | on | Refuse a character whose own records disagree with each other |
-| `RefuseMods` | on | Judge what the client has loaded, by plugin GUID |
-| `ModPolicy` | `Allow` | `Allow`: only what this server runs plus `AllowedMods`. `Deny`: all but `DeniedMods` |
-| `AllowedMods` | *empty* | Extra GUIDs a client may run. This server's own plugins are always allowed |
-| `DeniedMods` | *empty* | GUIDs no client may run. Only read under `Deny` |
-| `RefuseUnreported` | on | Refuse a connection that answers nothing, or an unreadable profile |
-| `RefusedMessage` | *a sentence* | Sent to the refused client so it lands in their own log |
-| `ProtectCharacter` | on | The client-side guard, and the binding that feeds it |
-| `ProtectOnServers` | on | Extend that guard to servers: leave a join into the wrong world before spawning |
-
-Note the standing BepInEx behaviour: every entry is written to disk on the first run and the
-saved value beats a new default in code. Changing a default in a later version does nothing on
-a machine that has already run the mod.
-
-`ProtectCharacter` is on while `Enforce` is off, and that asymmetry is deliberate. Refusing
-other people is a policy somebody should choose; refusing to let you irreversibly ruin your own
-character is just not standing by while it happens.
-
-## Scope
-
-Registers with Core at `Requirement.Everyone`. Not because clients decide anything, since only the
-server does, but because the facts being judged live on the client and have to be reported,
-so a client without the plugin answers nothing.
-
-## Running more than one server
-
-This used to be a warning, and it was the mod's worst hole. The guard covered local worlds
-only, and the door covered servers only where `Enforce` was on - so a non-enforcing server was
-a gap a character walked straight into. The game wrote that world into the profile, and the mod
-could do nothing but log
-
-> Character 'X' is bound to world A but is in world B. Too late to stop it - that world is now
-> written into the character.
-
-Which is exactly what happened the first time two servers ran here, one enforcing and one not.
-The character was ruined by the server that was being lenient.
-
-**As of 1.1 the client refuses that join itself**, before spawning, whatever the server does
-and whether or not the server runs this mod. That is what `ProtectOnServers` is, and it is on
-by default. The hole is closed from the side that has something to lose.
-
-The advice has not changed, because a lock is not a reason to stop being careful: keep a
-separate character per server. One character, one world, permanently. What has changed is that
-forgetting to do so is no longer irreversible.
-
-## Recovering a ruined character
-
-Restoring a character backup taken **before** the trip clears its travel record and it is
-admitted again. This is the only way back, and it has been done: a character refused for
-having visited another world came back from backup and was let in.
-
-Note the backup does not touch `dyrr-home.txt`, which lives beside the config rather than
-with the character - `dyrr forget <id>`, or deleting that character's line, clears the binding
-if it is now wrong. A restored character can therefore carry a stale home. That is harmless,
-a home pointing at a server world matches no local world, so the menu guard simply refuses all
-of them, which errs toward protection, but the world id quoted in the popup may be the old one.
-
-## Status: v1.1
-
-**Both branches have been run against a real dedicated server.** It refuses a character that
-has been elsewhere, with the reason on the client's own screen and in its own log; and it
-**admits** a clean character on an enforcing server. That second one mattered more than it
-sounds: until it happened, "works" and "refuses everybody" were indistinguishable, because
-every test until then involved a character that genuinely had travelled. The only arithmetic in
-the mod is counting worlds that are not this one, and that is now confirmed in both directions.
-
-Also confirmed: the menu guard's binding, the adoption of bindings from the old home file, and
-the backup recovery above.
-
-### New in 1.1, and untested
-
-Everything in 1.1 **compiles and has not been run in game**: the client-side guard on servers,
-the four extra cheat records, the mod check, the `dyrr` command and the named bindings.
-
-Two of those deserve to be treated with more suspicion than the rest. The client-side guard
-applies the same rule the menu guard has been applying correctly for a while, but at a new
-moment, and that moment was read out of the game's own code rather than observed - so it is
-unproven until a character has actually been turned back at somebody else's server. And
-`RefuseTampered` has never seen a tampered profile, for the same reason `RefuseCheats` never
-had: producing one takes deliberate work nobody has done here yet.
-
-### `RefuseCheats` has now fired
-
-It shipped in 1.0.0 on by default having never once triggered, which was disclosed here as the
-one gap. It needed a character deliberately flagged by `devcommands`, and nothing until now had
-produced one. On 2026-08-19 something did: `devcommands` then `god` in the console, quit to the
-menu, join an enforcing server.
+A refusal names who it was, by character name and by the platform id off the socket:
 
 ```
-Refused a connection: is flagged as having used cheats, and has run cheat command 'god'
+Refused a connection: Balder (76561198662440314) has played on 1 other world(s)
 ```
 
-Both cheat checks in one refusal, on screen and in both logs. Worth noting what the same test
-proved about the check next to it: the first attempt used a mod's god-mode button rather than
-the console and set none of the records, which is the distinction the
-[cheating section](#on-cheating-and-what-a-door-can-actually-do-about-it) is about.
+## Multiplayer
 
-### Known gaps
+Install Dyrr on the server and on every client. The server decides everything; the client only
+answers the question and protects itself.
 
-**`RefuseTampered` has never fired**, for the same reason `RefuseCheats` had not: producing a
-profile whose own records disagree takes deliberate work nobody has done. It is on by default.
-Unlike the others it cannot be triggered by playing the game wrong - only by editing a save -
-so the risk is that it never triggers rather than that it triggers wrongly.
+Longhouse Core is optional and the join check works without it. Two things are lost when it is
+not installed:
 
-The migration from the Threshold-era files is **confirmed working**, on a real run: the config
-came across with all seven values intact, the character bindings came across in full, and both
-original files were left untouched, since it copies rather than moves.
+- **The version check.** Core compares each Ezomic mod's version and build id when a client
+  connects and makes the server reject mismatches. That matters more here than elsewhere,
+  because the facts being judged are reported by the client, and an old build of Dyrr answering
+  an unfamiliar question is exactly what the version check would have caught. A report in a
+  format this build cannot read is treated as unreported rather than guessed at.
+- **The refusal screen.** Valheim's kick screen carries no text of its own. Core is what puts
+  the reason on it. Without Core, a refused player gets a generic screen and the reason in their
+  own `BepInEx/LogOutput.log`.
 
-## License
+With Core installed, Dyrr registers at `Requirement.Everyone`, so Core requires the plugin on
+both ends. Core also applies the host's config values on connected clients in memory, without
+writing their config file.
+
+**What a refused player sees.** With Core: `This server refused this connection. It has played
+on 2 other world(s).` on the kick screen, and the same line in their log. Without Core: the
+stock kicked screen, and the line in their log. A refusal by the client's own protection is
+different again: a local world gets a vanilla popup naming both worlds and the file to edit,
+while a stopped server join gets a plain disconnect screen, with the reason on it only when Core
+is installed.
+
+## Known limits
+
+- **Everything the client reports is self-reported**, the plugin list included. A purpose-built
+  client can lie about all of it. More records only raise what a liar has to keep straight.
+- **A cheat that never touches the console leaves no mark.** Confirmed here rather than
+  reasoned about: a god mode toggle that calls `Player.SetGodMode` directly writes none of the
+  four records the character checks read, so those checks correctly find nothing. `RefuseMods`
+  is what sees that client, by its plugin GUID.
+- **`RefuseTampered` has never fired in practice.** Producing a profile whose own records
+  disagree takes deliberate editing nobody here has done. It cannot be tripped by playing the
+  game wrong, so the risk is that it never fires rather than that it fires wrongly.
+- **The inventory watch can raise a false alarm after a crash.** See that section.
+- If Dyrr cannot read `PlayerProfile.m_worldData` at all, it says so once at error level and
+  judges nobody on travel, rather than reading an unreadable list as an empty one. Both travel
+  rules go quiet together and the server logs that it is judging without them.
+
+## Troubleshooting
+
+**There is no config file.** The plugin has to load once before BepInEx writes it. Start the
+game or the server, quit, look again.
+
+**A setting has no effect.** BepInEx saved the old value on first run and it beats the new
+default. Edit the `.cfg`, not just the docs.
+
+**Nobody is being refused.** `Enforce` is off by default. Run `dyrr` to see what the checks are
+set to and what the verdict on each connected player is.
+
+**Your own client is refused for mods.** A server does not run the tools you develop with. Put
+their GUIDs in `dyrr-mods.txt`.
+
+**The character select line is missing.** It follows `ProtectCharacter`. With that off there is
+nothing being enforced for it to describe.
+
+**A restored backup carries a stale home.** Backups do not touch `dyrr-home.txt`, which lives
+beside the config rather than with the character. Use `dyrr forget <id>` or delete that
+character's line.
+
+**Upgrading from Threshold.** Dyrr was called Threshold until 2026-08-18. On the first run it
+copies `ezomic.valheim.threshold.cfg` to its new name and adopts `threshold-home.txt` (and
+`boon-home.txt` before that) if `dyrr-home.txt` does not exist. Both originals are left in
+place. Confirmed on a real run, config and bindings intact.
+
+## Status
+
+Run against a real dedicated server in both directions: it refuses a character that has been
+elsewhere, with the reason on the client's own screen and in its own log, and it admits a clean
+character on an enforcing server. Both cheat checks have fired on a deliberately flagged
+character. Backup recovery, the menu guard's binding and the migration from the Threshold-era
+files are all confirmed. `RefuseTampered` is the one check that has never seen the thing it
+looks for.
+
+1.4.0 is the Valheim 1.0 rebuild. The achievements system turned `PlayerProfile`'s single stat
+record into an array of ten and moved the known-worlds and known-commands lists inside it, and
+the cheat counter is now resolved by name rather than by the ordinal the compiler baked in.
+Full history in [CHANGELOG.md](CHANGELOG.md).
+
+## Bug reports
+
+[The Discord](https://discord.gg/hJzAVaZ5wb) is the fastest route, and the right one if you are
+not sure whether what you are seeing is a bug. Issues on
+[the repo](https://github.com/Ezomic/valheim-dyrr) work too and suit anything long.
+
+Bring `BepInEx\LogOutput.log` from whichever end saw the problem, and say whether you were on a
+server or in single player. If a refusal is wrong, the `dyrr` output and the character's line
+from `dyrr-home.txt` are the two things that settle it. If a vanilla mechanic broke, check
+`AppData\LocalLow\IronGate\Valheim\Player.log` as well, because gameplay exceptions land there
+rather than in the BepInEx log.
+
+## Discord
+
+[discord.gg/hJzAVaZ5wb](https://discord.gg/hJzAVaZ5wb) is where mod information, updates,
+support, bug reports and compatibility questions go. There is also a small EU server running the
+pack if you want somewhere to play. Details are in the Discord.
+
+## Licence
 
 MIT. See [LICENSE](LICENSE).
 
-## Reporting bugs
-
-[The Discord](https://discord.gg/hJzAVaZ5wb) is the fastest route, and the right one if
-you are not sure whether what you are seeing is a bug at all. Issues on
-[the repo](https://github.com/Ezomic/valheim-dyrr) work too and suit anything long.
-
-Bring `BepInEx\LogOutput.log` if you can, and say whether you were on a server or your
-own world. The log is most of the difference between a fix and a guess, and it is written
-every session whether or not anything went wrong.
-
-## Part of the Longhouse pack
-
-This is one of [the Longhouse pack](https://thunderstore.io/c/valheim/p/Ezomic/Longhouse/),
-a pinned set of my mods that installs in one click and is what the Longhouse server runs. You
-do not need the pack to use this on its own, and nothing here behaves differently outside it.
-
-[The Discord](https://discord.gg/hJzAVaZ5wb) is where the server lives if you want to play on
-it: small, EU, hard combat difficulty and everything else vanilla.
-
-## Author
-
 Robbin Thijssen / Thijssen Software.
+
+## Part of Longhouse
+
+Dyrr is one of the mods in [the Longhouse pack](https://thunderstore.io/c/valheim/p/Ezomic/Longhouse/),
+which pins exact versions of its members. You do not need the pack to use this, and it behaves
+the same on its own.
