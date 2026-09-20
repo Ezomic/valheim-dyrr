@@ -145,7 +145,17 @@ namespace Dyrr
         }
 
         /// <summary>
-        /// The warning, as a HUD message to the one player.
+        /// Core's name for "put this line in one player's chat window", named by its string
+        /// rather than by referencing Core: Core is soft everywhere, and a client on an older
+        /// one simply does not answer to the name - ZRpc drops a method it has no handler for,
+        /// in silence. Crier names it the same way. It wants Core 1.2.5 or newer, and that is
+        /// less fragile than it sounds, because Core registers itself in its own version gate
+        /// with Requirement.Everyone: a client that connected at all is on this server's Core.
+        /// </summary>
+        private const string CoreChatLine = "Ezomic_Core_ChatLine";
+
+        /// <summary>
+        /// The warning, in that one player's chat window.
         ///
         /// This used to be a routed "ChatMessage" carrying an invented sender,
         /// <c>new PlatformUserID("Server")</c>, on the reasoning that a shout needs no
@@ -169,24 +179,30 @@ namespace Dyrr
         ///   spent two versions on that identity before concluding the identity was the
         ///   wrong thing to fix; `crier/src/Announce.cs` carries the write-up.
         ///
-        /// So the warning goes the way Crier's own notices go: MessageHud registers the
-        /// routed RPC "ShowMessage" taking only (type, text), and its handler calls
-        /// ShowMessage straight through - no sender, no permission check, no lookup to
-        /// fail. Center rather than Crier's TopLeft, and that is the one difference worth
-        /// arguing: TopLeft is the branch that also writes the message log, which suits a
-        /// notice you might have missed, while Center is the big crossfade the game saves
-        /// for what you must not miss. Two minutes from being disconnected is that.
+        /// The warning belongs in the chat window and nowhere else, which vanilla cannot do
+        /// from a server at all: the only chat-window call that takes a plain title instead
+        /// of a platform id has no network path, so it can only be made on the client. Core
+        /// is the client half. It registers "Ezomic_Core_ChatLine" on every connection and
+        /// writes the line into the window, then pops the window open the way an incoming
+        /// message does. MessageHud's routed "ShowMessage" was tried in between and works,
+        /// but it is the corner the game uses for notices, not the conversation.
         ///
-        /// One trap inherited from the vanilla channel: ShowMessage runs its text through
-        /// Localization.Localize, so a line containing a $token would be translated rather
-        /// than printed. This one has none, and should not grow one.
+        /// Personal by construction rather than by a filter: this goes down that one
+        /// player's own connection, so nobody else is sent it and nothing on the wire could
+        /// be read by anybody else.
+        ///
+        /// No $ escaping on this path, unlike the notice corner: the chat window does not
+        /// hand its text to the translator.
         /// </summary>
         private static void Warn(ZNetPeer peer, int minutesLeft)
         {
+            // Mirrors the kick below, which checks the same thing: a peer that is on its way
+            // out has no channel to be warned through, and that is not worth a log line.
+            if (peer.m_rpc == null) return;
+
             try
             {
-                ZRoutedRpc.instance.InvokeRoutedRPC(peer.m_uid, "ShowMessage",
-                    (int)MessageHud.MessageType.Center,
+                peer.m_rpc.Invoke(CoreChatLine, "Server",
                     "You seem to be away - move within " + minutesLeft
                     + " minute" + (minutesLeft == 1 ? "" : "s") + " or you will be kicked.");
 

@@ -7,14 +7,19 @@ and the mod uses [semantic versioning](https://semver.org).
 
 ### Fixed
 
-- **The warning before an idle kick is shown to the player again.** It was sent as a chat
-  message from a sender called "Server", and no client would draw it: that name is not a
-  platform user id, Valheim checks the sender's permission to send text before displaying
-  anything, and an invalid id fails that check rather than passing it. The server sent the
-  warning, the relay picked it up, and every client threw it away, so the only place it
-  appeared was a log. It now goes through the game's own on-screen message channel, the one
-  a world save announcement uses, which carries no sender and so has nothing to check. It
-  appears in the middle of the screen, where the game puts what you must not miss.
+- **The warning before an idle kick reaches the player.** It was sent as a chat message from
+  a sender called "Server", and no client would draw it: that name is not a platform user id,
+  Valheim checks the sender's permission to send text before it displays anything, and an
+  invalid id fails that check rather than passing it. The server sent the warning and every
+  client threw it away, so the only warning before a disconnect was one nobody ever saw. It
+  now goes into that one player's chat window, through Core, which is the only way a server
+  can write there at all. Nobody else is sent it. **This wants Core 1.2.5 or newer**; on an
+  older Core the line is ignored the way it always has been.
+
+### Added
+
+- The warning is written to the server log as well as shown, so it is visible to an admin
+  after the fact.
 
 ## [1.4.1] - 2026-09-12
 
