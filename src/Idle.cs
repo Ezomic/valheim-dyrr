@@ -145,22 +145,59 @@ namespace Dyrr
         }
 
         /// <summary>
-        /// A private chat line to the one player, through the same routed "ChatMessage"
-        /// every shout travels by - so it lands in the chat window they already watch,
-        /// with no client-side support needed.
+        /// The warning, as a HUD message to the one player.
+        ///
+        /// This used to be a routed "ChatMessage" carrying an invented sender,
+        /// <c>new PlatformUserID("Server")</c>, on the reasoning that a shout needs no
+        /// client-side support. **It was never shown to anybody**, and it failed silently,
+        /// which is why it survived a release: the server sent it, Crier read it off the
+        /// router and posted it to the site, and every client threw it away. So the one
+        /// place the warning existed was the one place the player was not looking.
+        ///
+        /// Two gates, either of them fatal, both in vanilla:
+        ///
+        /// - `PlatformUserID(string)` wants `Platform_userid`, the `Steam_7656...` form.
+        ///   "Server" has no platform part, so it fails to parse, `m_userID` is left null
+        ///   and `IsValid` is false. `Chat.OnNewChatMessage` hands the sender to
+        ///   `RelationsManager.CheckPermissionAsync` unless it is the local player, and
+        ///   that method opens with `if (!user.IsValid)` and completes with `Error`.
+        ///   `Error.IsGranted()` is false, so neither `AddString` nor the in-world text
+        ///   ever runs.
+        /// - A valid id would not have saved it either. `Terminal.AddString` looks the
+        ///   sender up with `ZNet.TryGetPlayerByPlatformUserID` and draws the *connected
+        ///   peer's* name, and a server has no entry in that list and never will. Crier
+        ///   spent two versions on that identity before concluding the identity was the
+        ///   wrong thing to fix; `crier/src/Announce.cs` carries the write-up.
+        ///
+        /// So the warning goes the way Crier's own notices go: MessageHud registers the
+        /// routed RPC "ShowMessage" taking only (type, text), and its handler calls
+        /// ShowMessage straight through - no sender, no permission check, no lookup to
+        /// fail. Center rather than Crier's TopLeft, and that is the one difference worth
+        /// arguing: TopLeft is the branch that also writes the message log, which suits a
+        /// notice you might have missed, while Center is the big crossfade the game saves
+        /// for what you must not miss. Two minutes from being disconnected is that.
+        ///
+        /// One trap inherited from the vanilla channel: ShowMessage runs its text through
+        /// Localization.Localize, so a line containing a $token would be translated rather
+        /// than printed. This one has none, and should not grow one.
         /// </summary>
         private static void Warn(ZNetPeer peer, int minutesLeft)
         {
             try
             {
-                ZRoutedRpc.instance.InvokeRoutedRPC(peer.m_uid, "ChatMessage",
-                    peer.m_refPos, (int)Talker.Type.Shout,
-                    // A parsed-from-string id rather than default(struct): the RPC
-                    // serialises UserId.ToString(), and a default's inner string is null.
-                    new UserInfo { Name = "Server",
-                                   UserId = new Splatform.PlatformUserID("Server") },
+                ZRoutedRpc.instance.InvokeRoutedRPC(peer.m_uid, "ShowMessage",
+                    (int)MessageHud.MessageType.Center,
                     "You seem to be away - move within " + minutesLeft
                     + " minute" + (minutesLeft == 1 ? "" : "s") + " or you will be kicked.");
+
+                // Logged as well as shown, because the warning used to reach the site as a
+                // chat line and now correctly does not: it is a server event, not something
+                // anybody said. Crier's log relay carries this to the site instead. The
+                // wording deliberately avoids "Kicked while away:", which Crier string
+                // matches to post a departure - a warning is not a departure.
+                DyrrPlugin.Log.LogInfo("Warned while away: " + peer.m_playerName
+                    + ", " + minutesLeft + " minute" + (minutesLeft == 1 ? "" : "s")
+                    + " left.");
             }
             catch (System.Exception e)
             {

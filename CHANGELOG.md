@@ -3,6 +3,19 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+
+- **The warning before an idle kick is shown to the player again.** It was sent as a chat
+  message from a sender called "Server", and no client would draw it: that name is not a
+  platform user id, Valheim checks the sender's permission to send text before displaying
+  anything, and an invalid id fails that check rather than passing it. The server sent the
+  warning, the relay picked it up, and every client threw it away, so the only place it
+  appeared was a log. It now goes through the game's own on-screen message channel, the one
+  a world save announcement uses, which carries no sender and so has nothing to check. It
+  appears in the middle of the screen, where the game puts what you must not miss.
+
 ## [1.4.1] - 2026-09-12
 
 ### Changed
