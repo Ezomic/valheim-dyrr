@@ -13,10 +13,10 @@ and the mod uses [semantic versioning](https://semver.org).
   invalid id fails that check rather than passing it. The server sent the warning and every
   client threw it away, so the only warning before a disconnect was one nobody ever saw. It
   now goes into that one player's chat window, through Core, which is the only way a server
-  can write there at all. Nobody else is sent it, and it is drawn as a shout, in yellow and
-  in capitals, so it does not read like somebody saying hello. **This needs the Core release
-  that added the voice**; on an older Core the line is ignored the way it always has been, so
-  the two travel together.
+  can write there at all. Nobody else is sent it, and it is drawn in the ordinary voice to
+  match: a shout is what the whole world hears, and this is meant for one person. **This
+  needs Core 1.2.5 or newer**; on an older Core the line is ignored the way it always has
+  been.
 
 ### Added
 

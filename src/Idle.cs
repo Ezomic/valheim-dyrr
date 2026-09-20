@@ -145,21 +145,20 @@ namespace Dyrr
         }
 
         /// <summary>
-        /// Core's name for "put this line in one player's chat window, in this voice", named
-        /// by its string rather than by referencing Core: Core is soft everywhere, and a
-        /// client on an older one simply does not answer to the name - ZRpc drops a method it
-        /// has no handler for, in silence. Crier names its channel the same way.
+        /// Core's name for "put this line in one player's chat window", named by its string
+        /// rather than by referencing Core: Core is soft everywhere, and a client on an older
+        /// one simply does not answer to the name - ZRpc drops a method it has no handler for,
+        /// in silence. Crier names its channel the same way.
         ///
-        /// That silence is the thing to know when releasing this. Core answers to this name
-        /// only from the version that added it, so Dyrr and Core have to travel together or
-        /// the warning goes back to being sent and never seen. It is less fragile than it
-        /// sounds, because Core registers itself in its own version gate with
-        /// Requirement.Everyone: a client that connected at all is on this server's Core.
-        ///
-        /// The older two-argument name, Ezomic_Core_ChatLine, is still there and still works;
-        /// it just cannot carry a voice, which is why this one exists.
+        /// This is the older two-argument name, and it is deliberate. Core also answers to
+        /// Ezomic_Core_ChatSay, which carries a voice, and this was sent as a shout for one
+        /// commit before Robbin called it: a shout is what everybody in the world hears, and
+        /// dressing a line meant for one player in that voice says the wrong thing about who
+        /// it went to. It stays in the ordinary voice, and staying on the two-argument name
+        /// is worth a little on top - it means Dyrr works on Core 1.2.5, which is already out,
+        /// rather than needing whichever version adds the voice.
         /// </summary>
-        private const string CoreChatSay = "Ezomic_Core_ChatSay";
+        private const string CoreChatLine = "Ezomic_Core_ChatLine";
 
         /// <summary>
         /// The warning, in that one player's chat window.
@@ -194,14 +193,10 @@ namespace Dyrr
         /// MessageHud's routed "ShowMessage" was tried in between and works, but it is the
         /// corner the game uses for notices, not the conversation.
         ///
-        /// Sent as a shout, so it is drawn in yellow and in capitals - vanilla's own
-        /// formatting for the type, applied inside Terminal.AddString rather than by anything
-        /// here. It is still one player's line: the voice says how it reads, not who hears
-        /// it.
-        ///
         /// Personal by construction rather than by a filter: this goes down that one
         /// player's own connection, so nobody else is sent it and nothing on the wire could
-        /// be read by anybody else.
+        /// be read by anybody else. It is drawn in the ordinary voice to match, because a
+        /// shout is the voice of a line the whole world hears and this is not one.
         ///
         /// No $ escaping on this path, unlike the notice corner: the chat window does not
         /// hand its text to the translator.
@@ -214,14 +209,9 @@ namespace Dyrr
 
             try
             {
-                // Shout, which the game draws yellow and in capitals. Not about who is sent
-                // it - this still goes down one connection and nobody else is told - but
-                // about how it reads: a notice that you are two minutes from being
-                // disconnected should not look like somebody saying hello.
-                peer.m_rpc.Invoke(CoreChatSay, "Server",
+                peer.m_rpc.Invoke(CoreChatLine, "Server",
                     "You seem to be away - move within " + minutesLeft
-                    + " minute" + (minutesLeft == 1 ? "" : "s") + " or you will be kicked.",
-                    (int)Talker.Type.Shout);
+                    + " minute" + (minutesLeft == 1 ? "" : "s") + " or you will be kicked.");
 
                 // Logged as well as shown, because the warning used to reach the site as a
                 // chat line and now correctly does not: it is a server event, not something
