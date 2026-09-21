@@ -93,6 +93,12 @@ The kick itself is vanilla's own `InternalKick`, the same path the console comma
 player gets the ordinary kicked screen with a reason attached. A locally hosted world is never
 watched.
 
+**The warning needs [Core](https://thunderstore.io/c/valheim/p/Ezomic/Longhouse_Core/) 1.2.5 or
+newer**, because a dedicated server cannot write into a chat window by itself: the line is sent
+to that one player and their Core draws it. Without Core, or on an older one, the kick still
+happens and the warning is only in the server's log. It is said in the ordinary voice rather
+than as a shout, since it is meant for one person.
+
 ## Inventory watch
 
 A player's inventory never crosses the wire in vanilla: it lives in their own `.fch` on their
@@ -298,6 +304,9 @@ not installed:
 - **The refusal screen.** Valheim's kick screen carries no text of its own. Core is what puts
   the reason on it. Without Core, a refused player gets a generic screen and the reason in their
   own `BepInEx/LogOutput.log`.
+- **The idle warning.** A server has no way to write into a player's chat window on its own, so
+  the warning before an idle kick goes through Core 1.2.5 or newer. Without it the kick is
+  unannounced and the warning exists only in the server log.
 
 With Core installed, Dyrr registers at `Requirement.Everyone`, so Core requires the plugin on
 both ends. Core also applies the host's config values on connected clients in memory, without
