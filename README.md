@@ -387,6 +387,15 @@ from `dyrr-home.txt` are the two things that settle it. If a vanilla mechanic br
 `AppData\LocalLow\IronGate\Valheim\Player.log` as well, because gameplay exceptions land there
 rather than in the BepInEx log.
 
+## Bugs and ideas
+
+Both go to the site. [longhouse.thijssensoftware.nl/bugs](https://longhouse.thijssensoftware.nl/bugs)
+is for anything broken, and [longhouse.thijssensoftware.nl/ideas](https://longhouse.thijssensoftware.nl/ideas)
+is for what a mod should do next. You can vote on other people's ideas there as well.
+
+Signing in takes a Steam or Discord account. I work from that list, so the votes decide what
+I pick up next.
+
 ## Discord
 
 [discord.gg/hJzAVaZ5wb](https://discord.gg/hJzAVaZ5wb) is where mod information, updates,
