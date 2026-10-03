@@ -145,22 +145,82 @@ namespace Dyrr
         }
 
         /// <summary>
-        /// A private chat line to the one player, through the same routed "ChatMessage"
-        /// every shout travels by - so it lands in the chat window they already watch,
-        /// with no client-side support needed.
+        /// Core's name for "put this line in one player's chat window", named by its string
+        /// rather than by referencing Core: Core is soft everywhere, and a client on an older
+        /// one simply does not answer to the name - ZRpc drops a method it has no handler for,
+        /// in silence. Crier names its channel the same way.
+        ///
+        /// This is the older two-argument name, and it is deliberate. Core also answers to
+        /// Ezomic_Core_ChatSay, which carries a voice, and this was sent as a shout for one
+        /// commit before Robbin called it: a shout is what everybody in the world hears, and
+        /// dressing a line meant for one player in that voice says the wrong thing about who
+        /// it went to. It stays in the ordinary voice, and staying on the two-argument name
+        /// is worth a little on top - it means Dyrr works on Core 1.2.5, which is already out,
+        /// rather than needing whichever version adds the voice.
+        /// </summary>
+        private const string CoreChatLine = "Ezomic_Core_ChatLine";
+
+        /// <summary>
+        /// The warning, in that one player's chat window.
+        ///
+        /// This used to be a routed "ChatMessage" carrying an invented sender,
+        /// <c>new PlatformUserID("Server")</c>, on the reasoning that a shout needs no
+        /// client-side support. **It was never shown to anybody**, and it failed silently,
+        /// which is why it survived a release: the server sent it, Crier read it off the
+        /// router and posted it to the site, and every client threw it away. So the one
+        /// place the warning existed was the one place the player was not looking.
+        ///
+        /// Two gates, either of them fatal, both in vanilla:
+        ///
+        /// - `PlatformUserID(string)` wants `Platform_userid`, the `Steam_7656...` form.
+        ///   "Server" has no platform part, so it fails to parse, `m_userID` is left null
+        ///   and `IsValid` is false. `Chat.OnNewChatMessage` hands the sender to
+        ///   `RelationsManager.CheckPermissionAsync` unless it is the local player, and
+        ///   that method opens with `if (!user.IsValid)` and completes with `Error`.
+        ///   `Error.IsGranted()` is false, so neither `AddString` nor the in-world text
+        ///   ever runs.
+        /// - A valid id would not have saved it either. `Terminal.AddString` looks the
+        ///   sender up with `ZNet.TryGetPlayerByPlatformUserID` and draws the *connected
+        ///   peer's* name, and a server has no entry in that list and never will. Crier
+        ///   spent two versions on that identity before concluding the identity was the
+        ///   wrong thing to fix; `crier/src/Announce.cs` carries the write-up.
+        ///
+        /// The warning belongs in the chat window and nowhere else, which vanilla cannot do
+        /// from a server at all: the only chat-window call that takes a plain title instead
+        /// of a platform id has no network path, so it can only be made on the client. Core
+        /// is the client half. It registers the name below on every connection, writes the
+        /// line into the window, then pops the window open the way an incoming message does.
+        /// MessageHud's routed "ShowMessage" was tried in between and works, but it is the
+        /// corner the game uses for notices, not the conversation.
+        ///
+        /// Personal by construction rather than by a filter: this goes down that one
+        /// player's own connection, so nobody else is sent it and nothing on the wire could
+        /// be read by anybody else. It is drawn in the ordinary voice to match, because a
+        /// shout is the voice of a line the whole world hears and this is not one.
+        ///
+        /// No $ escaping on this path, unlike the notice corner: the chat window does not
+        /// hand its text to the translator.
         /// </summary>
         private static void Warn(ZNetPeer peer, int minutesLeft)
         {
+            // Mirrors the kick below, which checks the same thing: a peer that is on its way
+            // out has no channel to be warned through, and that is not worth a log line.
+            if (peer.m_rpc == null) return;
+
             try
             {
-                ZRoutedRpc.instance.InvokeRoutedRPC(peer.m_uid, "ChatMessage",
-                    peer.m_refPos, (int)Talker.Type.Shout,
-                    // A parsed-from-string id rather than default(struct): the RPC
-                    // serialises UserId.ToString(), and a default's inner string is null.
-                    new UserInfo { Name = "Server",
-                                   UserId = new Splatform.PlatformUserID("Server") },
+                peer.m_rpc.Invoke(CoreChatLine, "Server",
                     "You seem to be away - move within " + minutesLeft
                     + " minute" + (minutesLeft == 1 ? "" : "s") + " or you will be kicked.");
+
+                // Logged as well as shown, because the warning used to reach the site as a
+                // chat line and now correctly does not: it is a server event, not something
+                // anybody said. Crier's log relay carries this to the site instead. The
+                // wording deliberately avoids "Kicked while away:", which Crier string
+                // matches to post a departure - a warning is not a departure.
+                DyrrPlugin.Log.LogInfo("Warned while away: " + peer.m_playerName
+                    + ", " + minutesLeft + " minute" + (minutesLeft == 1 ? "" : "s")
+                    + " left.");
             }
             catch (System.Exception e)
             {

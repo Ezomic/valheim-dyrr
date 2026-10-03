@@ -3,6 +3,26 @@
 Notable changes to Dyrr. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [1.4.2] - 2026-09-21
+
+### Fixed
+
+- **The warning before an idle kick reaches the player.** It was sent as a chat message from
+  a sender called "Server", and no client would draw it: that name is not a platform user id,
+  Valheim checks the sender's permission to send text before it displays anything, and an
+  invalid id fails that check rather than passing it. The server sent the warning and every
+  client threw it away, so the only warning before a disconnect was one nobody ever saw. It
+  now goes into that one player's chat window, through Core, which is the only way a server
+  can write there at all. Nobody else is sent it, and it is drawn in the ordinary voice to
+  match: a shout is what the whole world hears, and this is meant for one person. **This
+  needs Core 1.2.5 or newer**; on an older Core the line is ignored the way it always has
+  been.
+
+### Added
+
+- The warning is written to the server log as well as shown, so it is visible to an admin
+  after the fact.
+
 ## [1.4.1] - 2026-09-12
 
 ### Changed
